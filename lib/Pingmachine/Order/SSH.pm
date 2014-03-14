@@ -14,6 +14,11 @@ has 'key_type' => (
     required => 1,
 );
 
+sub probe_instance_key {
+    my ($self) = @_;
+    return $self->ssh->key_type;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
