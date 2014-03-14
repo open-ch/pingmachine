@@ -1,0 +1,165 @@
+#!/usr/bin/perl -w
+
+###############################################################################
+#
+# Pingmachine - Smokeping-like Latency Measurement
+#
+# Written by David Schweikert <dws@open.ch>, June 2011
+# Copyright (c) 2011-2014 Open Systems AG, Switzerland
+# All Rights Reserved.
+#
+# See LICENSE file for the software licensing conditions.
+#
+###############################################################################
+
+use strict;
+use feature ':5.10';
+use YAML::XS qw(LoadFile Dump);
+use Term::ANSIColor;
+use Try::Tiny;
+
+my $ORDERS_DIR = '/shared/work/OSAGping/orders';
+my $OUTPUT_DIR = '/shared/work/OSAGping/output';
+my $ORDER_NAME_RE = qr|^[0-9a-f]+$|;
+
+my %pretty_state_map = (
+    'up'      => my_colored('  UP  ', 'green'),
+    'down'    => my_colored(' DOWN ', 'red'),
+    'unknown' =>         ' unkn ',
+);
+
+sub my_colored {
+    if(-t STDOUT) {
+        return colored(@_);
+    }
+    else {
+        return $_[0];
+    }
+}
+
+sub pretty_rtt {
+    my ($rtt) = @_;
+    if(not defined $rtt) {
+        return '-';
+    }
+    return sprintf('%.0f ms', $rtt*1000);
+}
+
+sub pretty_loss {
+    my ($loss, $pings) = @_;
+    if(not defined $loss) {
+        return '-';
+    }
+    my $loss_pct = sprintf('%3.0f%%', $loss*100/$pings);
+    if($loss == 0 or $pings > 2 and $loss == 1) {
+        return my_colored($loss_pct, 'green');
+    }
+    elsif($loss < $pings) {
+        return my_colored($loss_pct, 'yellow');
+    }
+    else {
+        return my_colored($loss_pct, 'red');
+    }
+    return 
+}
+
+sub pretty_time {
+    my ($time) = @_;
+    my $delta_t = time - $time;
+    if($delta_t < 120) {
+        return sprintf("%3d s  ", $delta_t);
+    }
+    elsif($delta_t < 7200) {
+        return sprintf("%3d min", $delta_t / 60); # "120 min" -> 7 chars
+    }
+    elsif($delta_t < 48 * 3600) {
+        return sprintf("%3d h  ", $delta_t / 3600);
+    }
+    else {
+        return sprintf("%3d d  ", $delta_t / (3600*24));
+    }
+}
+
+sub pretty_order {
+    my ($order_id) = @_;
+    return undef unless $order_id;
+    return substr($order_id, 0, 8);
+}
+
+sub sortable_ip4 {
+    my ($ip) = @_;
+    defined $ip or return undef;
+    if($ip =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+        return sprintf("%03d.%03d.%03d.%03d", $1, $2, $3, $4);
+    }
+    else {
+        return $ip;
+    }
+}
+
+sub main {
+    # scan orders dir
+    my %orders;
+    my %orders_by_user;
+    opendir(my $od, $ORDERS_DIR) or die "ERROR: can't open $ORDERS_DIR: $!\n";
+    while(my $of = readdir($od)) {
+        next if $of eq '.' or $of eq '..';
+        next unless -f "$ORDERS_DIR/$of";
+        my $order;
+	try { $order = LoadFile("$ORDERS_DIR/$of"); }
+	catch { warn "WARNING: can't parse $ORDERS_DIR/$of\n"; };
+	next unless defined $order and defined $order->{user};
+        $orders{$of} = $order;
+        if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
+            $order->{probe_host} = $order->{$order->{probe}}{host};
+            $order->{sort_key} = sortable_ip4($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $of;
+        }
+        else {
+            $order->{sort_key} = 'ZZZ:' . $order->{probe} . ':' . $order->{step} . ':' . $of;
+        }
+        $orders_by_user{$order->{user}}{$of} = $order;
+    }
+    
+    # read results
+    for my $oid (keys %orders) {
+        if(-f "$OUTPUT_DIR/$oid/last_result") {
+            $orders{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result");
+        }
+    }
+
+    # pretty print
+    state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s\n";
+    my $first_user = 1;
+    for my $user (sort keys %orders_by_user) {
+        $first_user ? $first_user = 0 : print "\n";
+        say my_colored("- $user", 'bold');
+        say "";
+        printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss");
+        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x15, '-'x7, '-'x7, '-'x4);
+        for my $oid (sort { $orders{$a}{sort_key} cmp $orders{$b}{sort_key} } keys %{$orders_by_user{$user}})
+        {
+            my $order = $orders{$oid};
+            printf($format,
+                pretty_order($oid),
+                "$order->{step} s",
+                $order->{pings},
+                $order->{probe},
+                $order->{probe_host} // '-',
+                !defined $order->{result} ? '-' : (
+                    time - $order->{result}{updated} > $order->{step} ?
+                        my_colored(pretty_time($order->{result}{updated}), 'red') : 
+                        pretty_time($order->{result}{updated})
+                ),
+                !defined $order->{result} ? '-' : (
+                    pretty_rtt($order->{result}{median})
+                ),
+                !defined $order->{result} ? '-' : (
+                    pretty_loss($order->{result}{loss}, $order->{pings})
+                ),
+            );
+        }
+    }
+}
+
+main;
+
