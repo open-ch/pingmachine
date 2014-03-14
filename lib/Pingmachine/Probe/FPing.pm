@@ -44,6 +44,11 @@ has 'source_ip' => (
     isa => 'Str',
 );
 
+has 'interface' => (
+    is  => 'ro',
+    isa => 'Str',
+);
+
 with 'Pingmachine::Probe';
 
 sub _start_new_job {
@@ -80,12 +85,6 @@ sub _start_new_job {
     }
 
 
-    # Determine $source_ip (fping -S)
-    my $source_ip;
-    if ( $self->source_ip ) {
-        $source_ip = $self->source_ip;
-    }
-
     # Make sure that we can process all hosts
     if($interval / $hostcount < $MIN_WAIT) {
         die "fping: step * 1000 / (pings * hostcount) must be at least 10 (step=$step, pings=$pings, hostcount=$hostcount\n";
@@ -113,10 +112,13 @@ sub _start_new_job {
         '-i', $MIN_WAIT,
         '-t', $TIMEOUT,
     ];
-    if ( $source_ip ) {
-        # set source IP address (needed for default route switch)
+    if ( $self->source_ip ) {
         push @{$cmd}, '-S';
-        push @{$cmd}, $source_ip;
+        push @{$cmd}, $self->source_ip;
+    }
+    if ( $self->interface ) {
+        push @{$cmd}, '-I';
+        push @{$cmd}, $self->interface;
     }
     $log->debug("starting: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
     my $cv = run_cmd $cmd,

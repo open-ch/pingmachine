@@ -128,17 +128,18 @@ sub main {
     }
 
     # pretty print
-    state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s\n";
+    state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s%s\n";
     my $first_user = 1;
     for my $user (sort keys %orders_by_user) {
         $first_user ? $first_user = 0 : print "\n";
         say my_colored("- $user", 'bold');
         say "";
-        printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss");
-        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x15, '-'x7, '-'x7, '-'x4);
+        printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss", "");
+        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x15, '-'x7, '-'x7, '-'x4, "");
         for my $oid (sort { $orders{$a}{sort_key} cmp $orders{$b}{sort_key} } keys %{$orders_by_user{$user}})
         {
             my $order = $orders{$oid};
+            my $additional = additional_info($order);
             printf($format,
                 pretty_order($oid),
                 "$order->{step} s",
@@ -156,8 +157,29 @@ sub main {
                 !defined $order->{result} ? '-' : (
                     pretty_loss($order->{result}{loss}, $order->{pings})
                 ),
+                $additional ? "  ($additional)" : "",
             );
         }
+    }
+}
+
+sub additional_info {
+    my ($order) = @_;
+
+    my @additional;
+    if($order->{probe} eq 'fping') {
+        if($order->{fping}{interface}) {
+            push @additional, $order->{fping}{interface};
+        }
+        if($order->{fping}{source_ip}) {
+            push @additional, "source=".$order->{fping}{source_ip};
+        }
+    }
+    if(scalar @additional) {
+        return join(', ', @additional);
+    }
+    else {
+        return undef;
     }
 }
 

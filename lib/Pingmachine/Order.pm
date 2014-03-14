@@ -146,11 +146,10 @@ sub probe_instance_key {
     my ($self) = @_;
     my @keys = ( $self->probe, $self->pings, $self->step );
     if($self->probe eq 'fping') {
-        push (@keys, "interval:$self->fping->interval")   if ($self->fping->interval);
-        push (@keys, "source_ip:$self->fping->source_ip") if ($self->fping->source_ip);
+        push @keys, $self->fping->probe_instance_key;
     }
     if($self->probe eq 'ssh') {
-        push @keys, $self->ssh->key_type;
+        push @keys, $self->ssh->probe_instance_key;
     }
     return join('|', @keys);
 }
