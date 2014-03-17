@@ -4,7 +4,7 @@ use strict;
 
 use Log::Any qw($log);
 
-my $_base_dir    = '/shared/work/OSAGping';
+my $_base_dir    = '/var/lib/pingmachine';
 my $_orders_dir  = $_base_dir . '/orders';
 my $_output_dir  = $_base_dir . '/output';
 my $_archive_dir = $_base_dir . '/archive';
