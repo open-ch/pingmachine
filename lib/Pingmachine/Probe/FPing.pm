@@ -6,7 +6,7 @@ use AnyEvent::Util;
 use Log::Any qw($log);
 use List::Util qw(shuffle);
 
-my $FPING_BIN = -x '/opt/OSAGping/bin/fping' ? '/opt/OSAGping/bin/fping' : '/bin/fping';
+my $FPING_BIN = -x '/usr/bin/fping' ? '/usr/bin/fping' : '/usr/sbin/fping';
 
 my $TIMEOUT   = 3000; # -t option (in ms)
 my $MIN_WAIT  =   10; # -i option (is ms)

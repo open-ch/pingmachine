@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 ###############################################################################
 #
 # Pingmachine - Smokeping-like Latency Measurement
@@ -18,8 +17,8 @@ use YAML::XS qw(LoadFile Dump);
 use Term::ANSIColor;
 use Try::Tiny;
 
-my $ORDERS_DIR = '/shared/work/OSAGping/orders';
-my $OUTPUT_DIR = '/shared/work/OSAGping/output';
+my $ORDERS_DIR = '/var/lib/pingmachine/orders';
+my $OUTPUT_DIR = '/var/lib/pingmachine/output';
 my $ORDER_NAME_RE = qr|^[0-9a-f]+$|;
 
 my %pretty_state_map = (

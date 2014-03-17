@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-
 ###############################################################################
 #
 # Pingmachine - Smokeping-like Latency Measurement
