@@ -16,7 +16,7 @@ has 'key_type' => (
 
 sub probe_instance_key {
     my ($self) = @_;
-    return $self->ssh->key_type;
+    return $self->key_type;
 }
 
 __PACKAGE__->meta->make_immutable;
