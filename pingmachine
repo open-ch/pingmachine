@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+###############################################################################
+#
+# Pingmachine - Smokeping-like Latency Measurement
+#
+# Written by David Schweikert <dws@open.ch>, June 2011
+# Copyright (c) 2011-2014 Open Systems AG, Switzerland
+# All Rights Reserved.
+#
+# See LICENSE file for the software licensing conditions.
+#
+###############################################################################
+
+use EV;
+use Pingmachine::Main;
+use Net::Server::Daemonize qw(daemonize);
+use Getopt::Long;
+use Log::Any qw($log);
+use Log::Any::Adapter;
+
+my %opt = ();
+
+sub usage {
+    die "usage: pingmachine [--debug] [--user=USER] [--basedir=DIR]\n".
+        "       (default basedir: ".Pingmachine::Config->base_dir.")\n";
+}
+
+sub my_daemonize {
+    my ($uid, $gid, $groups);
+    if($opt{user}) {
+        ($uid, $gid) = (getpwnam($opt{user}))[2,3];
+        defined $uid or die "ERROR: can't resolve username $opt{user}";
+	$groups = `id -G $opt{user}`; chomp $groups;
+    }
+    chdir '/tmp';
+
+    daemonize('root', 'root', undef);
+
+    # Net::Server::Daemonize support for supplementary groups is buggy -> we
+    # need to do it ourselves with $)
+    #
+    # Note that this is important because fping is executable only by
+    # pingmachine's secondary group monitor
+    if($opt{user}) {
+        $) = "$gid $groups";
+        $> = $uid;
+    }
+
+    EV::default_loop->loop_fork();
+}
+
+sub main {
+    # Parse arguments
+    GetOptions (\%opt, 'debug|d', 'help|h', 'user|u=s', 'basedir|b=s');
+    usage() if $opt{help};
+    Pingmachine::Config->base_dir($opt{basedir})  if $opt{basedir};
+    
+    # Configure logging
+    if($opt{debug}) {
+        Log::Any::Adapter->set('Dispatch', outputs => [
+            [ 'Screen', min_level => 'debug', newline => 1 ],
+        ]);
+    }
+    else {
+        Log::Any::Adapter->set('Dispatch', outputs => [
+            [ 'Syslog', min_level => 'info', ident => 'pingmachine' ],
+        ]);
+    }
+
+    $EV::DIED = sub {
+        $log->error("INTERNAL ERROR: $@");
+    };
+
+    # Daemonize
+    my_daemonize() unless $opt{debug};
+
+    # Start Pingmachine
+    my $pingmachine = Pingmachine::Main->new();
+    $pingmachine->run();
+}
+
+main;
