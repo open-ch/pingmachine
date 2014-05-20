@@ -56,6 +56,7 @@ sub add_order {
                 interval  => $order->fping->interval || 0,
                 source_ip => $order->fping->source_ip || 0,
                 interface => $order->fping->interface || 0,
+		ipv6      => $order->fping->ipv6 || 0,
             );
         }
         elsif($probe_type eq 'ssh') {

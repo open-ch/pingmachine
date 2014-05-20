@@ -7,6 +7,7 @@ use Log::Any qw($log);
 use List::Util qw(shuffle);
 
 my $FPING_BIN = -x '/usr/bin/fping' ? '/usr/bin/fping' : '/usr/sbin/fping';
+my $FPING6_BIN = '/usr/bin/fping6';
 
 my $TIMEOUT   = 3000; # -t option (in ms)
 my $MIN_WAIT  =   10; # -i option (is ms)
@@ -47,6 +48,12 @@ has 'source_ip' => (
 has 'interface' => (
     is  => 'ro',
     isa => 'Str',
+);
+
+has 'ipv6' => (
+    is  => 'ro',
+    isa => 'Bool',
+    default => 0,
 );
 
 with 'Pingmachine::Probe';
@@ -105,7 +112,7 @@ sub _start_new_job {
 
     # Run fping
     my $cmd = [
-        $FPING_BIN,
+        $self->ipv6 ? $FPING6_BIN : $FPING_BIN,
         '-q',
         '-p', $interval,
         '-C', $pings,
