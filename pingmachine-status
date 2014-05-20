@@ -100,6 +100,7 @@ sub main {
     # scan orders dir
     my %orders;
     my %orders_by_user;
+    my $any_ipv6;
     opendir(my $od, $ORDERS_DIR) or die "ERROR: can't open $ORDERS_DIR: $!\n";
     while(my $of = readdir($od)) {
         next if $of eq '.' or $of eq '..';
@@ -112,6 +113,9 @@ sub main {
         if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
             $order->{probe_host} = $order->{$order->{probe}}{host};
             $order->{sort_key} = sortable_ip4($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $of;
+            if($order->{$order->{probe}}{ipv6}) {
+                $any_ipv6 = 1;
+            }
         }
         else {
             $order->{sort_key} = 'ZZZ:' . $order->{probe} . ':' . $order->{step} . ':' . $of;
@@ -128,13 +132,16 @@ sub main {
 
     # pretty print
     state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s%s\n";
+    if($any_ipv6) {
+        $format = "  %-8s %7s %5s %-8s %-32s %-7s %7s %4s%s\n";
+    }
     my $first_user = 1;
     for my $user (sort keys %orders_by_user) {
         $first_user ? $first_user = 0 : print "\n";
         say my_colored("- $user", 'bold');
         say "";
         printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss", "");
-        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x15, '-'x7, '-'x7, '-'x4, "");
+        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x($any_ipv6 ? 32 : 15), '-'x7, '-'x7, '-'x4, "");
         for my $oid (sort { $orders{$a}{sort_key} cmp $orders{$b}{sort_key} } keys %{$orders_by_user{$user}})
         {
             my $order = $orders{$oid};
