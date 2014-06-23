@@ -49,6 +49,7 @@ sub add_order {
     my $probe = $self->_find_probe_for_new_order($key);
     if(not defined $probe) {
         my $probe_type = $order->probe;
+        $log->debug("create new probe for key: $key");
         if($probe_type eq 'fping') {
             $probe = Pingmachine::Probe::FPing->new(
                 step      => $order->step,

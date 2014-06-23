@@ -1,2 +1,7 @@
-2014-05-20  David Schweikert  <david@schweikert.ch>
+2014-06-23  David Schweikert  <dws@open.ch>
+  * Release 0.5
+  * Improve support for IPv6 fping orders
+
+2014-05-20  David Schweikert  <dws@open.ch>
+  * Release 0.4
   * Add support for IPv6 fping orders

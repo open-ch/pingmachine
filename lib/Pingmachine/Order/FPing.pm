@@ -26,16 +26,21 @@ has 'interval' => (
 has 'ipv6' => (
     isa => 'Bool',
     is  => 'ro',
+    lazy => 1,
+    default => sub {
+        my $self = shift;
+        return $self->host =~ /^[:0-9a-f]+$/i;
+    },
 );
 
 sub probe_instance_key {
     my ($self) =@_;
 
     my @keys;
-    push (@keys, "interval:$self->fping->interval")   if ($self->interval);
-    push (@keys, "source_ip:$self->fping->source_ip") if ($self->source_ip);
-    push (@keys, "interface:$self->fping->interface") if ($self->interface);
-    push (@keys, "v6:$self->fping->ipv6") if ($self->ipv6);
+    push (@keys, "interval:".$self->interval)   if ($self->interval);
+    push (@keys, "source_ip:".$self->source_ip) if ($self->source_ip);
+    push (@keys, "interface:".$self->interface) if ($self->interface);
+    push (@keys, "v6:".$self->ipv6) if ($self->ipv6);
     scalar @keys or @keys = ('');
 
     return join('|', @keys);

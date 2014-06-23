@@ -85,10 +85,14 @@ sub pretty_order {
     return substr($order_id, 0, 8);
 }
 
-sub sortable_ip4 {
+sub sortable_ip {
     my ($ip) = @_;
     defined $ip or return undef;
-    if($ip =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
+    if($ip =~ /^[:0-9a-f]+$/i) {
+        my @n = split(/:/, $ip);
+        return "a.".join(":", map { sprintf "%04x", hex($_) } @n);
+    }
+    elsif($ip =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/) {
         return sprintf("%03d.%03d.%03d.%03d", $1, $2, $3, $4);
     }
     else {
@@ -106,14 +110,14 @@ sub main {
         next if $of eq '.' or $of eq '..';
         next unless -f "$ORDERS_DIR/$of";
         my $order;
-	try { $order = LoadFile("$ORDERS_DIR/$of"); }
-	catch { warn "WARNING: can't parse $ORDERS_DIR/$of\n"; };
-	next unless defined $order and defined $order->{user};
+        try { $order = LoadFile("$ORDERS_DIR/$of"); }
+        catch { warn "WARNING: can't parse $ORDERS_DIR/$of\n"; };
+        next unless defined $order and defined $order->{user};
         $orders{$of} = $order;
         if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
             $order->{probe_host} = $order->{$order->{probe}}{host};
-            $order->{sort_key} = sortable_ip4($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $of;
-            if($order->{$order->{probe}}{ipv6}) {
+            $order->{sort_key} = sortable_ip($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $of;
+            if($order->{$order->{probe}}{host} =~ /^[:0-9a-f]+$/i) {
                 $any_ipv6 = 1;
             }
         }
@@ -133,7 +137,7 @@ sub main {
     # pretty print
     state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s%s\n";
     if($any_ipv6) {
-        $format = "  %-8s %7s %5s %-8s %-32s %-7s %7s %4s%s\n";
+        $format = "  %-8s %7s %5s %-8s %-36s %-7s %7s %4s%s\n";
     }
     my $first_user = 1;
     for my $user (sort keys %orders_by_user) {
