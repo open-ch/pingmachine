@@ -130,7 +130,8 @@ sub main {
     # read results
     for my $oid (keys %orders) {
         if(-f "$OUTPUT_DIR/$oid/last_result") {
-            $orders{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result");
+            try { $orders{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result"); }
+            catch { warn "WARNING: can't parse $OUTPUT_DIR/$oid/last_result\n"; }
         }
     }
 

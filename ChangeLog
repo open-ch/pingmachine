@@ -1,3 +1,6 @@
+UNRELEASED
+  * pingmachine-status: warn if last_result can't be loaded
+
 2014-06-23  David Schweikert  <dws@open.ch>
   * Release 0.5
   * Improve support for IPv6 fping orders
