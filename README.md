@@ -24,6 +24,8 @@ understand the reason for its architecture):
 - Consolidation using maximum, minimum and average functions.
 - Management of old targets data (the list of targets change rather frequently!)
 
+Check out also this [blog post about pingmachine](https://blog.open.ch/labs/2015/11/24/pingmachine/).
+
 Smokeping vs. Pingmachine
 -------------------------
 After initial tests with Smokeping, we decided to write our own framework for
