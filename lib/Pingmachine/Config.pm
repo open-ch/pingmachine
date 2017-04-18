@@ -6,11 +6,13 @@ use Log::Any qw($log);
 
 my $_base_dir    = '/var/lib/pingmachine';
 my $_orders_dir  = $_base_dir . '/orders';
+my $_telegraf_dir  = $_base_dir . '/telegraf';
 my $_output_dir  = $_base_dir . '/output';
 my $_archive_dir = $_base_dir . '/archive';
 my $_orders_max_age = 3660; # 1 hour plus some margin
 
 sub orders_dir     { return $_orders_dir; }
+sub telegraf_dir     { return $_telegraf_dir; }
 sub output_dir     { return $_output_dir; }
 sub archive_dir    { return $_archive_dir; }
 sub orders_max_age { return $_orders_max_age; }
@@ -20,6 +22,7 @@ sub base_dir {
     if(defined $value) {
         $_base_dir    = $value;
         $_orders_dir  = $_base_dir . '/orders';
+        $_telegraf_dir  = $_base_dir . '/telegraf';
         $_output_dir  = $_base_dir . '/output';
         $_archive_dir = $_base_dir . '/archive';
     }
@@ -32,7 +35,7 @@ sub rras {
     if($rrd_template eq 'smokeping' and $step < 300) {
         return [
             [ 'AVERAGE',  0.5,   1,  900 ],
-            
+
             [ 'AVERAGE',  0.5,   300/$step,  864 ], # 72 hours, 5 min. resolution (day)
             [     'MIN',  0.5,   300/$step,  864 ],
             [     'MAX',  0.5,   300/$step,  864 ],
