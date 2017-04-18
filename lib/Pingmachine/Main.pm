@@ -93,6 +93,9 @@ sub _create_dir_structure {
     # - orders
     my $orders_dir = Pingmachine::Config->orders_dir;
     mkpath($orders_dir) unless -d $orders_dir;
+    # - telegraf
+    my $telegraf_dir = Pingmachine::Config->telegraf_dir;
+    mkpath($telegraf_dir) unless -d $telegraf_dir;
     # - output
     my $output_dir = Pingmachine::Config->output_dir;
     mkpath($output_dir) unless -d $output_dir;
@@ -110,7 +113,7 @@ sub run {
     # Create basedir structure
     $self->_create_dir_structure;
 
-    # Install signal watchers for SIGINT and SIGTERM 
+    # Install signal watchers for SIGINT and SIGTERM
     $self->add_ae_watcher(
         AnyEvent->signal(signal => "INT",  cb => sub { $self->ae_quit_cv->send() })
     );
