@@ -12,7 +12,7 @@ my $_archive_dir = $_base_dir . '/archive';
 my $_orders_max_age = 3660; # 1 hour plus some margin
 
 sub orders_dir     { return $_orders_dir; }
-sub telegraf_dir     { return $_telegraf_dir; }
+sub telegraf_dir   { return $_telegraf_dir; }
 sub output_dir     { return $_output_dir; }
 sub archive_dir    { return $_archive_dir; }
 sub orders_max_age { return $_orders_max_age; }
@@ -27,6 +27,19 @@ sub base_dir {
         $_archive_dir = $_base_dir . '/archive';
     }
     return $_base_dir;
+}
+
+my ($host, $port);
+
+sub get_telegraf { return ($host, $port); }
+
+sub set_telegraf {
+    my ($class, $value) = @_;
+    if(defined $value) {
+        ($host, $port) = split(':', $value);
+        return ($host, $port);
+    }
+    return;
 }
 
 sub rras {

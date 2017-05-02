@@ -82,6 +82,7 @@ has 'lock' => (
     },
 );
 
+
 # log_die: we need this to properly log before the event loop starts
 sub log_die {
     $log->fatal("$_[0]");
