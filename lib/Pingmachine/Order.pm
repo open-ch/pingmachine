@@ -319,7 +319,7 @@ sub _update_telegraf {
         # set our socket to non blocking mode
         AnyEvent::Util::fh_nonblocking($telegraf_socket, 1);
 
-        my $result_rrd_time = sprintf("%d%09d", $rrd_time , ($rrd_time - int($rrd_time)) * 1_000_000_000);
+        my $result_rrd_time = sprintf("%d%09d", $rrd_time , ($rrd_time - int($rrd_time)) * 1_000_000_000); # nanoseconds time conversion required by InfluxDB::LineProtocol
         my $influx_line = data2line($measurement_name, {median_rtt => $median, min_rtt => $min, max_rtt => $max, loss => $loss * 1.0}, $tags, $result_rrd_time);
 
         $telegraf_socket->send($influx_line,0) or die("Cannot send message");
