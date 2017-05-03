@@ -304,12 +304,8 @@ sub _update_telegraf {
 
     if ($self->telegraf->{'measurement_name'} && Pingmachine::Config->get_telegraf) {
         my ($telegraf_host, $telegraf_port) = Pingmachine::Config->get_telegraf;
-        print "EXISTS\n";
         my $measurement_name = $self->telegraf->{'measurement_name'};
-        my $tunnel_id = $self->telegraf->{'tunnel_id'};
-        my $remote_host = $self->telegraf->{'remote_host'};
-        my $interface = $self->telegraf->{'interface'};
-        my $remote_interface = $self->telegraf->{'remote_interface'};
+        my $tags = $self->telegraf->{'tags'};
 
         # Create the socket.
         my $telegraf_socket = new IO::Socket::INET(
@@ -324,14 +320,14 @@ sub _update_telegraf {
         AnyEvent::Util::fh_nonblocking($telegraf_socket, 1);
 
         my $result_rrd_time = sprintf("%d%09d", $rrd_time , ($rrd_time - int($rrd_time)) * 1_000_000_000);
-        my $influx_line = data2line($measurement_name, {median_rtt => $median, min_rtt => $min, max_rtt => $max, loss => $loss * 1.0}, { interface => $interface, remote_interface => $remote_interface, remote_host => $remote_host, tunnel_id => $tunnel_id}, $result_rrd_time);
+        my $influx_line = data2line($measurement_name, {median_rtt => $median, min_rtt => $min, max_rtt => $max, loss => $loss * 1.0}, $tags, $result_rrd_time);
 
         $telegraf_socket->send($influx_line,0) or die("Cannot send message");
 
         for my $i (0..$successful_pings-1) {
             my $time = $rrd_time + $step * $i / $successful_pings;
             my $result_time = sprintf("%d%09d", $time , ($time - int($time)) * 1_000_000_000);
-            $influx_line = data2line($measurement_name, { individual_rtt => $rtts[$i]}, { interface => $interface, remote_interface => $remote_interface, remote_host => $remote_host, tunnel_id => $tunnel_id}, $result_time);
+            $influx_line = data2line($measurement_name, { individual_rtt => $rtts[$i]}, $tags, $result_time);
 
             $telegraf_socket->send($influx_line,0) or die("Cannot send message");
         }
