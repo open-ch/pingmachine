@@ -52,10 +52,10 @@ pingmachine should be able to handle it.
 
 To make this possible, pingmachine uses a directory where configuration
 "snippets" are put by whoever wants something to be done. These configuration
-snippets are called *orders*. The configuration of one order is not allowed to
-change. Orders can only be added or removed.
+snippets are called *orders* and *telegraf*. The configuration of one order or telegraf order is not allowed to
+change. Orders and telegraf orders can only be added or removed.
 
-Pingmachine monitors that /orders directory, immediately picks up new orders,
+Pingmachine monitors these /orders and /telegraf directories, immediately picks up new orders and telegraf orders,
 and does what is necessary to start with the measurements. If the order file is
 deleted, pingmachine will also automatically stop with that monitoring.
 
@@ -63,20 +63,21 @@ The output produced by the monitoring work, will be put in a separate directory
 (/output), which can then be used by who give the order to fetch the data:
 
                        .----> /orders >----,
-                      /                     \
+                      /       /telegraf     \
       Application----.                       .---- pingmachine <----> fping
                       \                     /
                        `----< /output <----'
 
 
-Orders Specification
+Orders and telegraf orders Specification
 --------------------
 An order is typically one target IP address that needs to be monitored. If an
 application needs to monitor an IP address, it just writes the corresponding
 order file in the "/orders" directory (more about the exact directory structure
-later).
+later). It additionally writes a corresponding telegraf file in the "telegraf"
+directory if the IP address belongs to a tunnel.
 
-Orders also need to be periodically refreshed (at least once an hour), to make
+Orders and telegraf orders also need to be periodically refreshed (at least once an hour), to make
 sure that pingmachine continues with the measurements. This mechanism is needed
 to make sure that no stale configuration has the consequence of monitoring an
 IP address indefinitely.
@@ -91,10 +92,20 @@ A example order could be (in YAML):
      fping:
          host: 62.179.116.250
 
+A example telegraf order could be (in YAML):
+
+     measurement_name: tunnel
+     tags:
+         tunnel_id: 12458
+         remote_host: 5292
+         interface: eth2
+         remote_interface: eth2
+
 The file name (the order "id") is determined by calculating the md5 checksum on
 the file contents. This makes sure that different orders have different
 identifiers and also that, if the same order reappears, it is going to have the
-same id.
+same id. The file name of the existing telegraf files is the same as the one of
+the corresponding order file.
 
 The file-system tree could look as follows:
 
@@ -102,11 +113,14 @@ The file-system tree could look as follows:
      |---- orders/
      | |---- 6dd803dc5d29b72564467de7ddbfc695
      | |---- cd7d89acdba05cef56184db4a7b044ea
+     |---- telegraf/
+     | |---- 6dd803dc5d29b72564467de7ddbfc695
+     | |---- cd7d89acdba05cef56184db4a7b044ea
 
-Note that orders are to be considered dynamic configuration, and are not meant
+Note that orders and telegraf orders are to be considered dynamic configuration, and are not meant
 to be, for example, put in a buildall configuration archive. The "users" (tmon,
 etc.) are the high-level programs that are configured by buildall, and they
-will just install order files, as needed, to do the measurements, as they were
+will just install order and telegraf files, as needed, to do the measurements, as they were
 instructed. In other words: the complete /var/lib/pingmachine/OSAGping
 directory can be completely deleted and recreated (with the loss of measured
 data, however).
@@ -152,6 +166,11 @@ As soon as the "order" file of an archived order is put again into the orders
 directory, pingmachine will move the output data into place again. It should
 not be possible to have both data in output and in archive for the same order.
 
+Sent metrics
+------------
+For every telegraf file, both metrics gathered by pingmachine and metrics
+provided in the telegraf file are sent to InfluDB.
+
 Installation
 ------------
 Required perl modules:
@@ -159,6 +178,8 @@ Required perl modules:
 - AnyEvent
 - Log::Any
 - Log::Any::Adapter::Dispatch
+- InfluxDB::LineProtocol
+- IO::Socket
 - Mouse
 - MouseX::NativeTraits
 - RRDs (RRDtool)
