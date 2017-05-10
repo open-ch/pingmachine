@@ -21,7 +21,7 @@ use Log::Any::Adapter;
 my %opt = ();
 
 sub usage {
-    die "usage: pingmachine [--debug] [--user=USER] [--basedir=DIR]\n".
+    die "usage: pingmachine [--debug] [--user=USER] [--basedir=DIR] [--telegraf=HOST:PORT]\n".
         "       (default basedir: ".Pingmachine::Config->base_dir.")\n";
 }
 
@@ -51,10 +51,11 @@ sub my_daemonize {
 
 sub main {
     # Parse arguments
-    GetOptions (\%opt, 'debug|d', 'help|h', 'user|u=s', 'basedir|b=s');
+    GetOptions (\%opt, 'debug|d', 'help|h', 'user|u=s', 'basedir|b=s', 'telegraf|t=s');
     usage() if $opt{help};
     Pingmachine::Config->base_dir($opt{basedir})  if $opt{basedir};
-    
+    Pingmachine::Config->set_telegraf($opt{telegraf})  if $opt{telegraf};
+
     # Configure logging
     if($opt{debug}) {
         Log::Any::Adapter->set('Dispatch', outputs => [

@@ -183,7 +183,7 @@ sub _collect_current_job {
 
     my $job = $self->current_job;
     $self->current_job({});
-    my %results = ();
+    my %results;
 
     # Do nothing, if fping didn't run yet or if job has been already collected
     return unless $job->{output};
@@ -193,11 +193,14 @@ sub _collect_current_job {
     while($text !~ /\G\z/gc) {
         if($text =~ /\G(\S+)[ \t]+:/gc) {
             my $host = $1;
-            my @data = ();
+            my @data;
             while($text =~ /\G[ \t]+([-\d\.]+)/gc) {
                 push @data, $1;
             }
-
+            # raw ping times
+            my @pings = map {$_ eq '-' ? undef : $_ / 1000} @data;
+            $results{$host}{pings} = \@pings;
+            # sorted rtt times
             my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
             $results{$host}{rtts} = \@rtts;
         }

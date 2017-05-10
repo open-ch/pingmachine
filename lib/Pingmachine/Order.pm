@@ -5,12 +5,16 @@ package Pingmachine::Order;
 
 use Any::Moose;
 use Any::Moose '::Util::TypeConstraints';
+use IO::Socket;
+use AnyEvent::Util qw(fh_nonblocking);
 use AnyEvent;
 use Log::Any qw($log);
 use RRDs;
 use File::Path;
 use File::Temp qw(tempfile);
 use File::Copy qw(move);
+use YAML::XS qw(LoadFile);
+use InfluxDB::LineProtocol qw(data2line);
 
 use Pingmachine::Config;
 use Pingmachine::Order::FPing;
@@ -59,6 +63,16 @@ has 'order_file' => (
     required => 1,
 );
 
+has 'telegraf_file' => (
+    isa => 'Str',
+    is => 'ro',
+);
+
+has 'telegraf' => (
+    isa => 'HashRef',
+    is => 'ro',
+    default  => sub { return {} },
+);
 
 has 'my_output_dir' => (
     isa => 'Str',
@@ -106,6 +120,7 @@ has 'ssh' => (
     is  => 'ro',
     coerce => 1,
 );
+
 
 sub BUILD {
     my $self = shift;
@@ -166,7 +181,7 @@ sub _rrd_create {
 
     my $rrdfile = $self->rrd_filename;
     return if -f $rrdfile;
-    
+
     # This is all very Smokeping-inspired
     my $now = int(AnyEvent->now);
     RRDs::create(
@@ -192,6 +207,7 @@ sub add_results {
 
     $log->debug($self->id.": add results") if $log->is_debug();
 
+    $self->_update_telegraf($rrd_time, $results);
     $self->_update_rrd($rrd_time, $results);
     $self->_update_last_results_file($rrd_time, $results);
 }
@@ -221,7 +237,7 @@ sub _update_rrd {
             my $corrupted = $rrdfile;
             $corrupted     =~ s/main\.rrd/corrupted_main\.rrd/;
 
-            move( $rrdfile, $corrupted ) 
+            move( $rrdfile, $corrupted )
               or $log->error("could not move corrupted $rrdfile: $!");
 
             # create a new rrd file
@@ -271,6 +287,53 @@ sub _update_last_results_file {
         return;
     };
 }
+
+# Sends messages to telegraf
+sub _update_telegraf {
+    my ($self, $rrd_time, $results) = @_;
+
+    my @rtts    = @{$results->{pings}};
+    my @sorted_rtts    = @{$results->{rtts}};
+    my $all_pings = scalar @rtts;
+    my $successful_pings = scalar @sorted_rtts;
+    my $loss    = 100.0*($all_pings - $successful_pings)/$all_pings;
+    my $median = $rtts[int($successful_pings/2)]; # will be undef if empty
+    my $min = $sorted_rtts[0]; # will be undef if empty
+    my $max = pop @sorted_rtts; # will be undef if empty
+    my $step = $self->step;
+
+    if ($self->telegraf->{'measurement_name'} && Pingmachine::Config->get_telegraf) {
+        my ($telegraf_host, $telegraf_port) = Pingmachine::Config->get_telegraf;
+        my $measurement_name = $self->telegraf->{'measurement_name'};
+        my $tags = $self->telegraf->{'tags'};
+
+        # Create the socket.
+        my $telegraf_socket = new IO::Socket::INET(
+            PeerAddr => $telegraf_host,
+            PeerPort => $telegraf_port,
+            Proto    => 'udp',
+            Type     => IO::Socket::SOCK_DGRAM,
+            Blocking => 0,
+        )  or die("Can't open UDP socket: $@");
+
+        # set our socket to non blocking mode
+        AnyEvent::Util::fh_nonblocking($telegraf_socket, 1);
+
+        my $result_rrd_time = sprintf("%d%09d", $rrd_time , ($rrd_time - int($rrd_time)) * 1_000_000_000); # nanoseconds time conversion required by InfluxDB::LineProtocol
+        my $influx_line = data2line($measurement_name, {median_rtt => $median, min_rtt => $min, max_rtt => $max, loss => $loss * 1.0}, $tags, $result_rrd_time);
+
+        $telegraf_socket->send($influx_line,0) or die("Cannot send message");
+
+        for my $i (0..$successful_pings-1) {
+            my $time = $rrd_time + $step * $i / $successful_pings;
+            my $result_time = sprintf("%d%09d", $time , ($time - int($time)) * 1_000_000_000);
+            $influx_line = data2line($measurement_name, { individual_rtt => $rtts[$i]}, $tags, $result_time);
+
+            $telegraf_socket->send($influx_line,0) or die("Cannot send message");
+        }
+    }
+}
+
 
 sub archive {
     my ($self) = @_;
