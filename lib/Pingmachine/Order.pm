@@ -324,9 +324,11 @@ sub _update_telegraf {
 
         $telegraf_socket->send($influx_line,0) or die("Cannot send message");
 
-        for my $i (0..$successful_pings-1) {
+        for my $i (0..$all_pings-1) {
             my $time = $rrd_time + $step * $i / $successful_pings;
             my $result_time = sprintf("%d%09d", $time , ($time - int($time)) * 1_000_000_000);
+
+            next if (! $rtts[$i]);
             $influx_line = data2line($measurement_name, { individual_rtt => $rtts[$i]}, $tags, $result_time);
 
             $telegraf_socket->send($influx_line,0) or die("Cannot send message");
