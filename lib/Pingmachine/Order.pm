@@ -320,8 +320,16 @@ sub _update_telegraf {
         AnyEvent::Util::fh_nonblocking($telegraf_socket, 1);
 
         my $result_rrd_time = sprintf("%d%09d", $rrd_time , ($rrd_time - int($rrd_time)) * 1_000_000_000); # nanoseconds time conversion required by InfluxDB::LineProtocol
-        my $influx_line = data2line($measurement_name, {median_rtt => $median, min_rtt => $min, max_rtt => $max, loss => $loss * 1.0}, $tags, $result_rrd_time);
 
+        # undef will be casted to empty string which will mess up the influx schema definition
+        # so only select the defined fields
+        my $fields = {};
+        $fields->{median_rtt} = sprintf("%f", $median) if defined $median;
+        $fields->{min_rtt}    = sprintf("%f", $min)    if defined $min;
+        $fields->{max_rtt}    = sprintf("%f", $max)    if defined $max;
+        $fields->{loss}       = sprintf("%f",$loss)    if defined $loss;
+
+        my $influx_line = data2line($measurement_name, $fields, $tags, $result_rrd_time);
         $telegraf_socket->send($influx_line,0) or die("Cannot send message");
 
         for my $i (0..$all_pings-1) {
