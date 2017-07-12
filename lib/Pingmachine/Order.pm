@@ -333,7 +333,7 @@ sub _update_telegraf {
         $telegraf_socket->send($influx_line,0) or die("Cannot send message");
 
         for my $i (0..$all_pings-1) {
-            my $time = $rrd_time + $step * $i / $successful_pings;
+            my $time = $rrd_time + $step * $i / $all_pings;
             my $result_time = sprintf("%d%09d", $time , ($time - int($time)) * 1_000_000_000);
 
             next if (! $rtts[$i]);
