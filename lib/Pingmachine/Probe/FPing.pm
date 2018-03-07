@@ -7,6 +7,7 @@ use Log::Any qw($log);
 use List::Util qw(shuffle);
 
 my $FPING_BIN = -x '/usr/bin/fping' ? '/usr/bin/fping' : '/usr/sbin/fping';
+my $FPING6_BIN = '/usr/bin/fping6';
 
 my $TIMEOUT   = 3000; # -t option (in ms)
 my $MIN_WAIT  =   10; # -i option (is ms)
@@ -47,6 +48,12 @@ has 'source_ip' => (
 has 'interface' => (
     is  => 'ro',
     isa => 'Str',
+);
+
+has 'ipv6' => (
+    is  => 'ro',
+    isa => 'Bool',
+    default => 0,
 );
 
 with 'Pingmachine::Probe';
@@ -105,7 +112,7 @@ sub _start_new_job {
 
     # Run fping
     my $cmd = [
-        $FPING_BIN,
+        $self->ipv6 ? $FPING6_BIN : $FPING_BIN,
         '-q',
         '-p', $interval,
         '-C', $pings,
@@ -176,7 +183,7 @@ sub _collect_current_job {
 
     my $job = $self->current_job;
     $self->current_job({});
-    my %results = ();
+    my %results;
 
     # Do nothing, if fping didn't run yet or if job has been already collected
     return unless $job->{output};
@@ -186,11 +193,14 @@ sub _collect_current_job {
     while($text !~ /\G\z/gc) {
         if($text =~ /\G(\S+)[ \t]+:/gc) {
             my $host = $1;
-            my @data = ();
+            my @data;
             while($text =~ /\G[ \t]+([-\d\.]+)/gc) {
                 push @data, $1;
             }
-
+            # raw ping times
+            my @pings = map {$_ eq '-' ? undef : $_ / 1000} @data;
+            $results{$host}{pings} = \@pings;
+            # sorted rtt times
             my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
             $results{$host}{rtts} = \@rtts;
         }

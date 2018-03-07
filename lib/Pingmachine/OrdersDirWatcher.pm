@@ -29,6 +29,14 @@ has 'orders_dir' => (
     },
 );
 
+has 'telegraf_dir' => (
+    isa      => 'Str',
+    is       => 'ro',
+    default  => sub {
+        return Pingmachine::Config->telegraf_dir;
+    },
+);
+
 has 'order_list' => (
     isa      => 'Pingmachine::OrderList',
     is       => 'ro',
@@ -67,8 +75,8 @@ sub _scan_orders_directory {
     my $now = int(AnyEvent->now);
     opendir($dh, $orders_dir) or die "can't open $orders_dir: $!";
     ORDER: while (my $order_id = readdir($dh)) {
-	next if $order_id eq '.' or $order_id eq '..';
-        
+        next if $order_id eq '.' or $order_id eq '..';
+
         # Check: obsolete
         my $file = $orders_dir . '/' . $order_id;
         my ($mtime) = (lstat($file))[9];
@@ -83,39 +91,51 @@ sub _scan_orders_directory {
                 $self->_remove_order($order_id);
             }
             else {
-                my $order = $self->_parse_order($order_id, $self->orders_dir . '/' . $order_id);
+                my $order = $self->_parse_order($order_id, $self->orders_dir . '/' . $order_id, $self ->telegraf_dir . '/' . $order_id);
                 $order->archive($order_id) if $order;
             }
             unlink($file);
             next ORDER;
         }
-        
+
         # Add order
-	$self->_add_order($order_id);
-	$in_directory{$order_id} = 1;
+        $self->_add_order($order_id);
+        $in_directory{$order_id} = 1;
     }
     for my $order_id ($self->order_list->list) {
-	if (not defined $in_directory{$order_id}) {
-	    $self->_remove_order($order_id);
-	}
+        if (not defined $in_directory{$order_id}) {
+            $self->_remove_order($order_id);
+        }
     }
 }
 
 sub _parse_order {
-    my ($self, $order_id, $order_file) = @_;
+    my ($self, $order_id, $order_file, $telegraf_file) = @_;
 
     my $order;
     try {
         my $order_def = LoadFile($order_file);
         $order_def->{id} = $order_id;
         $order_def->{order_file} = $order_file;
-	$order = Pingmachine::Order->new($order_def);
+        if (-e $telegraf_file) {
+            $order_def->{telegraf_file} = $telegraf_file;
+            try {
+                $order_def->{telegraf} = LoadFile($telegraf_file);
+            }
+            catch {
+                my $error = $_;
+                chomp $error;
+                unlink $telegraf_file;
+                $log->warning("unable to load telegraf file $telegraf_file ($error). It has been deleted as it was most likely corrupt.");
+            }
+        }
+        $order = Pingmachine::Order->new($order_def);
     }
     catch {
-	chomp $_;
-	$log->warning("error processing order file: $order_file ($_)");
+        my $error = $_;
+        chomp $error;
         unlink $order_file;
-        $log->warning("deleted order file $order_file. It was most likely corrupt.");
+        $log->warning("unable to load order file $order_file ($error). It has been deleted as it was most likely corrupt.");
     };
     return $order;
 }
@@ -128,17 +148,18 @@ sub _add_order {
 
     # Skip it, if it doesn't look like a order file
     $order_id =~ $ORDER_NAME_RE or do {
-	$log->notice("skipping file in orders directory: $order_id");
-	return;
+    $log->notice("skipping file in orders directory: $order_id");
+    return;
     };
 
     # Parse
-    my $order = $self->_parse_order($order_id, $self->orders_dir . '/' . $order_id);
+    my $order = $self->_parse_order($order_id, $self ->orders_dir . '/' . $order_id, $self ->telegraf_dir . '/' . $order_id);
     return unless $order;
 
     # Add order to list
     $self->order_list->add_order($order);
 }
+
 
 sub _remove_order {
     my ($self, $order_id) = @_;
@@ -158,19 +179,19 @@ sub _remove_order {
 #    my ($self) = @_;
 #
 #    my $inotify = new Linux::Inotify2
-#	or die "unable to create new inotify object: $!";
+#        or die "unable to create new inotify object: $!";
 #    $inotify->watch(
-#	$self->orders_dir,
-#	IN_CLOSE_WRITE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO,
-#	sub {
-#	    my $e = shift;
-#	    if($e->IN_CLOSE_WRITE or $e->IN_MOVED_TO) {
-#		$self->_add_order($e->name) if -f $self->orders_dir . '/' . $e->name;
-#	    }
-#	    elsif($e->IN_DELETE or $e->IN_MOVED_FROM) {
-#		$self->_remove_order($e->name);
-#	    }
-#	}
+#        $self->orders_dir,
+#        IN_CLOSE_WRITE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO,
+#        sub {
+#            my $e = shift;
+#            if($e->IN_CLOSE_WRITE or $e->IN_MOVED_TO) {
+#                $self->_add_order($e->name) if -f $self->orders_dir . '/' . $e->name;
+#            }
+#            elsif($e->IN_DELETE or $e->IN_MOVED_FROM) {
+#                $self->_remove_order($e->name);
+#            }
+#        }
 #    );
 #
 #    $self->add_ae_watcher(

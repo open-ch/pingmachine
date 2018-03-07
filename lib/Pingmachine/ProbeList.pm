@@ -49,6 +49,7 @@ sub add_order {
     my $probe = $self->_find_probe_for_new_order($key);
     if(not defined $probe) {
         my $probe_type = $order->probe;
+        $log->debug("create new probe for key: $key");
         if($probe_type eq 'fping') {
             $probe = Pingmachine::Probe::FPing->new(
                 step      => $order->step,
@@ -56,6 +57,7 @@ sub add_order {
                 interval  => $order->fping->interval || 0,
                 source_ip => $order->fping->source_ip || 0,
                 interface => $order->fping->interface || 0,
+		ipv6      => $order->fping->ipv6 || 0,
             );
         }
         elsif($probe_type eq 'ssh') {

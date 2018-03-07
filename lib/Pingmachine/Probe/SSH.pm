@@ -129,20 +129,25 @@ sub _collect_results {
     return unless defined $stdout;
 
     my $xml_ref = XMLin($stdout);
-    
+
     # Process XML output
     my %results;
     foreach my $host (@{$xml_ref->{host}}) {
         my $address = $host->{address}{addr};
         my $status  = $host->{ports}{port}{state}{state}  // $host->{status}{state};
         my $product = $host->{ports}{port}{service}{product};
-        #my $reason  = $host->{ports}{port}{state}{reason} // $host->{status}{reason};
-        
+
         if( $status eq 'open' && $product && $product =~ /SSH/i ) {
-            $results{$address}{rtts} = [ $host->{times}{srtt}/1000000 ];    # convert ns to ms
+            my $ping = $host->{times}{srtt}/1000000;     # convert ns to ms
+            $results{$address}{rtts} = [$ping]; # sorted rtts
+            $results{$address}{pings} = [$ping]; # raw ping values
+        }
+        else {
+            $results{$address}{pings} = [undef];
+            $results{$address}{rtts} = [];
         }
     }
-    
+
     # Add results
     my $now = int(AnyEvent->now);
     my $step = $self->step;
@@ -150,12 +155,7 @@ sub _collect_results {
     for my $host (keys %{$job->{host2order}}) {
         my $h2o = $job->{host2order}{$host};
         for my $order (@{$h2o}) {
-            if(defined $results{$host}) {
-                $order->add_results($rrd_time, $results{$host});
-            }
-            else {
-                $order->add_results($rrd_time, { rtts => [] } );
-            }
+            $order->add_results($rrd_time, $results{$host});
         }
     }
 
