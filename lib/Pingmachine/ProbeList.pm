@@ -4,6 +4,8 @@ use Any::Moose;
 use Log::Any qw($log);
 
 use Pingmachine::Probe::FPing;
+use Pingmachine::Probe::SPing;
+use Pingmachine::Probe::PPing;
 use Pingmachine::Probe::SSH;
 
 has '_probes' => (
@@ -58,6 +60,26 @@ sub add_order {
                 source_ip => $order->fping->source_ip || 0,
                 interface => $order->fping->interface || 0,
 		ipv6      => $order->fping->ipv6 || 0,
+            );
+        }
+        elsif($probe_type eq 'sping') {
+            $probe = Pingmachine::Probe::SPing->new(
+                step      => $order->step,
+                pings     => $order->pings,
+                interval  => $order->sping->interval || 0,
+                source_ip => $order->sping->source_ip || 0,
+                interface => $order->sping->interface || 0,
+		ipv6      => $order->sping->ipv6 || 0,
+            );
+        }
+        elsif($probe_type eq 'pping') {
+            $probe = Pingmachine::Probe::PPing->new(
+                step      => $order->step,
+                pings     => $order->pings,
+                interval  => $order->pping->interval || 0,
+                source_ip => $order->pping->source_ip || 0,
+                interface => $order->pping->interface || 0,
+		ipv6      => $order->pping->ipv6 || 0,
             );
         }
         elsif($probe_type eq 'ssh') {
