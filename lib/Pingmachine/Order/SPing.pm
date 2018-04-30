@@ -47,7 +47,6 @@ sub probe_instance_key {
     push (@keys, "flags:".$self->flags) if ($self->flags);
     push (@keys, "interface:".$self->interface) if ($self->interface);
     push (@keys, "v6:".$self->ipv6) if ($self->ipv6);
-    scalar @keys or @keys = ('');
 
     return join('|', @keys);
 }

@@ -6,8 +6,8 @@ use AnyEvent::Util;
 use Log::Any qw($log);
 use List::Util qw(shuffle);
 
-my $scionDir = $ENV{'SC'}'
-my $SPING_BIN = $scionDir.'bin/scmp_fping';
+my $SCION_DIR = $ENV{'SC'} // '/home/scion/go/src/github.com/scionproto/scion';
+my $SPING_BIN = "$SCION_DIR/bin/scmp_fping";
 
 my $TIMEOUT   = 3000; # -t option (in ms)
 my $MIN_WAIT  =   10; # -i option (is ms)
@@ -70,13 +70,13 @@ sub _start_new_job {
     # available $step time (to increase the probability of detecting periodic
     # problems and to decrease the network peak load).
     # - We wait for at least 1 seconds for each ping ($interval).
-    # - We can instruct fping to distribute the pings (fping -p parameter).
+    # - We can instruct sping to distribute the pings (sping -interval parameter).
     #   That parameter also determines the maximal wait time, so we
     #   can have at most $step/$interval pings if we ping a single
     #   host.
     # - If multiple hosts are pinged, then we need also to consider the $MIN_WAIT
-    #   (fping -i) parameter.
-    # - The total time needed by fping is (assuming $hostcount*MIN_WAIT < $interval):
+    #   (sping -timeout) parameter.
+    # - The total time needed by sping is (assuming $hostcount*MIN_WAIT < $interval):
     #     ($pings-1)*interval + *$hostcount*$MIN_WAIT + $TIMEOUT
 
     my $step  = $self->step;
@@ -85,27 +85,28 @@ sub _start_new_job {
 
     return unless $hostcount;
 
-    # Determine $interval (fping -p)
-    my $interval; # interval applies only to periods between pings in series (fping -p)
+    # Determine $interval (sping -interval)
+    my $interval; # interval applies only to periods between pings in series (sping -interval, with -c != 1)
     if($self->interval) {
         $interval = $self->interval;
     }
     else {
         $interval = int(($step * 1000 * 0.8 - $hostcount*$MIN_WAIT - $TIMEOUT) / $pings);
         $interval >= 1000 or
-            die "fping: calculated interval too small: $interval (step = $step, pings = $pings)\n";
+            die "sping: calculated interval too small: $interval (step = $step, pings = $pings)\n";
     }
 
 
     # Make sure that we can process all hosts
     if($interval / $hostcount < $MIN_WAIT) {
-        die "fping: step * 1000 / (pings * hostcount) must be at least 10 (step=$step, pings=$pings, hostcount=$hostcount\n";
+        die "sping: step * 1000 / (pings * hostcount) must be at least 10 (step=$step, pings=$pings, hostcount=$hostcount\n";
     }
 
     # Prepare job
     my %job = (
         host2order => {},
         output     => '',
+        effective_cmd => '',
         pid        => '',
     );
     for my $order ($self->order_list->get_all) {
@@ -118,7 +119,7 @@ sub _start_new_job {
     # Run scmp
     my $single_host = substr $job{hostlist}, 0, -1;
     $log->info("single_host: ".$single_host);
-    my $cmd = [
+    my @cmd = [
         $SPING_BIN,
         '-id', 'scmp_echo',
         '-interval', $interval.'ms',
@@ -128,12 +129,12 @@ sub _start_new_job {
         '-local', $self->source_ip,
     ];
     # Policy and performance flags
-    push @{$cmd}, $self->flags;
+    push @cmd, $self->flags;
     #
-    my $switch_dir = 'cd '.$scionDir;
-    my $cmd_string = $switch_dir." && ".join(" ", @$cmd);
+    my $cmd_string = "cd $SCION_DIR && ".join(' ', @cmd);
     my $effective_cmd = [ 'su', 'scion', '-c', $cmd_string ];
-    $log->debug("starting: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+    $job{effective_cmd} = join(' ', @$effective_cmd);
+    $log->debug("starting: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
 
     my $cv = run_cmd $effective_cmd,
         '2>', '/dev/null',
@@ -154,11 +155,11 @@ sub _start_new_job {
                 return;
             }
 
-            $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("finished: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
 
             $self->_collect_current_job();
 
-            $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("collected: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
         }
     );
 }
@@ -168,8 +169,15 @@ sub _kill_current_job {
 
     # Kill sping, if still running
     my $job = $self->current_job;
-    if($job->{pid}) {
-        if(kill(0, $job->{pid})) {
+    my $job_pid = $job->{pid};
+    if($job_pid) {
+        # Check that we are killing the process we started and not an innocent bystander
+        my $cmd_match = 0;
+        if (open(proc_fh, "/proc/${job_pid}/cmdline")) {
+            $cmd_match = (join('', readline(proc_fh)) eq $job->{effective_cmd});
+            close(proc_fh);
+        }
+        if($cmd_match && kill(0, $job->{pid})) {
             $log->warning("killing unfinished sping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
             kill 9, $job->{pid};
             $job->{pid} = undef;
@@ -226,7 +234,7 @@ sub _collect_current_job {
         my $rrd_time = $now - $step - $now%$step;
         for my $host (keys %results) {
             my $h2o = $job->{host2order}{$host};
-            if(not defined $h2o) {
+            unless ($h2o) {
                 $log->warning("sping produced results for unknown host (host: $host, step: $step)");
                 next;
             }
