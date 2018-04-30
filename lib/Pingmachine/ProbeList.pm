@@ -68,6 +68,7 @@ sub add_order {
                 pings     => $order->pings,
                 interval  => $order->sping->interval || 0,
                 source_ip => $order->sping->source_ip || 0,
+                flags     => $order->sping->flags || '',
                 interface => $order->sping->interface || 0,
 		ipv6      => $order->sping->ipv6 || 0,
             );
@@ -78,6 +79,7 @@ sub add_order {
                 pings     => $order->pings,
                 interval  => $order->pping->interval || 0,
                 source_ip => $order->pping->source_ip || 0,
+                flags     => $order->pping->flags || '',
                 interface => $order->pping->interface || 0,
 		ipv6      => $order->pping->ipv6 || 0,
             );

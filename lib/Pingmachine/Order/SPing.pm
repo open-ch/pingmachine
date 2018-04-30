@@ -13,6 +13,11 @@ has 'source_ip' => (
     is  => 'ro',
 );
 
+has 'flags' => (
+    isa => 'Str',
+    is  => 'ro',
+);
+
 has 'interface' => (
     isa => 'Str',
     is  => 'ro',
@@ -39,6 +44,7 @@ sub probe_instance_key {
     my @keys;
     push (@keys, "interval:".$self->interval)   if ($self->interval);
     push (@keys, "source_ip:".$self->source_ip) if ($self->source_ip);
+    push (@keys, "flags:".$self->flags) if ($self->flags);
     push (@keys, "interface:".$self->interface) if ($self->interface);
     push (@keys, "v6:".$self->ipv6) if ($self->ipv6);
     scalar @keys or @keys = ('');

@@ -45,6 +45,11 @@ has 'source_ip' => (
     isa => 'Str',
 );
 
+has 'flags' => (
+    is  => 'ro',
+    isa => 'Str',
+);
+
 has 'interface' => (
     is  => 'ro',
     isa => 'Str',
@@ -125,6 +130,9 @@ sub _start_new_job {
         '-local', $self->source_ip,
         '-aggregate',
     ];
+    # Policy and performance flags
+    push @{$cmd}, $self->flags;
+    #
     my $switch_dir = 'cd '.$scionDir;
     my $cmd_string = $switch_dir." && ".join(" ", @$cmd);
     my $effective_cmd = [ 'su', 'scion', '-c', $cmd_string ];
@@ -149,11 +157,11 @@ sub _start_new_job {
                 return;
             }
 
-	    $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
 
             $self->_collect_current_job();
 
-	    $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
         }
     );
 }
@@ -168,7 +176,7 @@ sub _kill_current_job {
             $log->warning("killing unfinished pping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
             kill 9, $job->{pid};
             $job->{pid} = undef;
-	}
+        }
         elsif($job->{output}) {
             $log->warning("pping has finished, but we didn't notice... collecting (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset.")");
             $self->_collect_current_job();
@@ -209,7 +217,7 @@ sub _collect_current_job {
         }
 
         # discard any other output on the line (ICMP host unreachable errors, etc.)
-	$text =~ /\G.*\n/gc;
+        $text =~ /\G.*\n/gc;
     }
 
     $log->debug("adding results") if $log->is_debug();
