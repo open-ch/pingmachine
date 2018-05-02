@@ -101,6 +101,7 @@ sub _start_new_job {
     my %job = (
         host2order => {},
         output     => '',
+        cmd        => '',
         pid        => '',
     );
     for my $order ($self->order_list->get_all) {
@@ -128,6 +129,7 @@ sub _start_new_job {
         push @{$cmd}, $self->interface;
     }
     $log->debug("starting: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+    $job{cmd} = join(' ', @$cmd);
     my $cv = run_cmd $cmd,
         '<', \$job{hostlist},
         '>', '/dev/null',
@@ -148,11 +150,11 @@ sub _start_new_job {
                 return;
             }
 
-	    $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
 
             $self->_collect_current_job();
 
-	    $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
         }
     );
 }
@@ -162,8 +164,14 @@ sub _kill_current_job {
 
     # Kill fping, if still running
     my $job = $self->current_job;
-    if($job->{pid}) {
-    	if(kill(0, $job->{pid})) {
+    if($job_pid) {
+        # Check that we are killing the process we started and not an innocent bystander
+        my $cmd_match = 0;
+        if (open(proc_fh, "/proc/${job_pid}/cmdline")) {
+            $cmd_match = (join('', readline(proc_fh)) eq $job->{cmd});
+            close(proc_fh);
+        }
+        if($cmd_match && kill(0, $job->{pid})) {
             $log->warning("killing unfinished fping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
             kill 9, $job->{pid};
             $job->{pid} = undef;
