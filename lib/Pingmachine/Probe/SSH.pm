@@ -72,7 +72,7 @@ sub _start_new_job {
         '-n',           # disable DNS resolution
         '-PN',          # disable host discovery (assume all hosts online)
         '-p',22,
-        '--max_rtt_timeout',$SSH_TIMEOUT,
+        '--max-rtt-timeout',$SSH_TIMEOUT,
         '-oX','-',      # XML output format
         '-iL','-',      # use stdin to input list
         '-sV',          # enable version detection
