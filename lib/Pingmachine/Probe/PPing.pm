@@ -1,4 +1,4 @@
-package Pingmachine::Probe::FPing;
+package Pingmachine::Probe::PPing;
 
 use Any::Moose;
 use AnyEvent;
@@ -6,8 +6,8 @@ use AnyEvent::Util;
 use Log::Any qw($log);
 use List::Util qw(shuffle);
 
-my $FPING_BIN = -x '/usr/bin/fping' ? '/usr/bin/fping' : '/usr/sbin/fping';
-my $FPING6_BIN = '/usr/bin/fping6';
+my $SCION_DIR = $ENV{'SC'} // '/home/scion/go/src/github.com/scionproto/scion';
+my $PPING_BIN = "$SCION_DIR/bin/pingpong";
 
 my $TIMEOUT   = 3000; # -t option (in ms)
 my $MIN_WAIT  =   10; # -i option (is ms)
@@ -15,7 +15,7 @@ my $MIN_WAIT  =   10; # -i option (is ms)
 has 'name' => (
     is => 'ro',
     isa => 'Str',
-    default => sub { "fping" },
+    default => sub { "pping" },
 );
 
 has 'max_orders' => (
@@ -45,6 +45,11 @@ has 'source_ip' => (
     isa => 'Str',
 );
 
+has 'flags' => (
+    is  => 'ro',
+    isa => 'Str',
+);
+
 has 'interface' => (
     is  => 'ro',
     isa => 'Str',
@@ -65,13 +70,13 @@ sub _start_new_job {
     # available $step time (to increase the probability of detecting periodic
     # problems and to decrease the network peak load).
     # - We wait for at least 1 seconds for each ping ($interval).
-    # - We can instruct fping to distribute the pings (fping -p parameter).
+    # - We can instruct pping to distribute the pings (pping -interval parameter).
     #   That parameter also determines the maximal wait time, so we
     #   can have at most $step/$interval pings if we ping a single
     #   host.
     # - If multiple hosts are pinged, then we need also to consider the $MIN_WAIT
-    #   (fping -i) parameter.
-    # - The total time needed by fping is (assuming $hostcount*MIN_WAIT < $interval):
+    #   (pping -timeout) parameter.
+    # - The total time needed by pping is (assuming $hostcount*MIN_WAIT < $interval):
     #     ($pings-1)*interval + *$hostcount*$MIN_WAIT + $TIMEOUT
 
     my $step  = $self->step;
@@ -80,63 +85,66 @@ sub _start_new_job {
 
     return unless $hostcount;
 
-    # Determine $interval (fping -p)
-    my $interval; # interval applies only to periods between pings in series (fping -p)
+    # Determine $interval (pping -interval)
+    my $interval; # interval applies only to periods between pings in series (pping -interval, -c != 1)
     if($self->interval) {
         $interval = $self->interval;
     }
     else {
         $interval = int(($step * 1000 * 0.8 - $hostcount*$MIN_WAIT - $TIMEOUT) / $pings);
         $interval >= 1000 or
-            die "fping: calculated interval too small: $interval (step = $step, pings = $pings)\n";
+            die "pping: calculated interval too small: $interval (step = $step, pings = $pings)\n";
     }
 
 
     # Make sure that we can process all hosts
     if($interval / $hostcount < $MIN_WAIT) {
-        die "fping: step * 1000 / (pings * hostcount) must be at least 10 (step=$step, pings=$pings, hostcount=$hostcount\n";
+        die "pping: step * 1000 / (pings * hostcount) must be at least 10 (step=$step, pings=$pings, hostcount=$hostcount\n";
     }
 
     # Prepare job
     my %job = (
         host2order => {},
         output     => '',
-        cmd        => '',
+        effective_cmd => '',
         pid        => '',
     );
     for my $order ($self->order_list->get_all) {
-        my $host = $order->fping->host;
+        my $host = $order->pping->host;
         push @{$job{host2order}{$host}}, $order;
     }
     $job{hostlist} = join("\n", shuffle keys %{$job{host2order}}) . "\n",
     $self->current_job(\%job);
 
-    # Run fping
-    my $cmd = [
-        $self->ipv6 ? $FPING6_BIN : $FPING_BIN,
-        '-q',
-        '-p', $interval,
-        '-C', $pings,
-        '-i', $MIN_WAIT,
-        '-t', $TIMEOUT,
+    # Run pingpong
+    my $single_host = substr $job{hostlist}, 0, -1;
+    $log->info("single_host: ".$single_host);
+    my @cmd = [
+        $PPING_BIN,
+        '-id', 'pingpong_client',
+        '-mode', 'client',
+        '-interval', $interval.'ms',
+        '-count', $pings,
+        '-timeout', $TIMEOUT.'s',
+        '-format', '"%[3]s : %[5]s"',
+        '-remote', $single_host,
+        '-local', $self->source_ip,
+        '-aggregate',
     ];
-    if ( $self->source_ip ) {
-        push @{$cmd}, '-S';
-        push @{$cmd}, $self->source_ip;
-    }
-    if ( $self->interface ) {
-        push @{$cmd}, '-I';
-        push @{$cmd}, $self->interface;
-    }
-    $log->debug("starting: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
-    $job{cmd} = join(' ', @$cmd);
-    my $cv = run_cmd $cmd,
-        '<', \$job{hostlist},
-        '>', '/dev/null',
-        '2>', \$job{output},
+    # Policy and performance flags
+    push @cmd, $self->flags;
+    #
+    my $cmd_string = "cd $SCION_DIR && ".join(' ', @cmd);
+    my $effective_cmd = [ 'su', 'scion', '-c', $cmd_string ];
+    $job{effective_cmd} = join(' ', @$effective_cmd);
+    $log->debug("starting: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+
+    my $cv = run_cmd $effective_cmd,
+        '2>', '/dev/null',
+        '>', \$job{output},
         '$$', \$job{pid};
 
-    # Install fping exit callback
+    # Install pping exit callback
     $cv->cb(
         sub {
             my $cbv = shift;
@@ -146,15 +154,15 @@ sub _start_new_job {
             if($exit and $exit != 1 and $exit != 2) {
                 # exit 1 means that some hosts aren't reachable
                 # exit 2 means "any IP addresses were not found"
-                $log->warning("fping seems to have failed (exit: $exit, stderr: ".$job{output}.")");
+                $log->warning("pping seems to have failed (exit: $exit, stderr: ".$job{output}.")");
                 return;
             }
 
-            $log->debug("finished: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("finished: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
 
             $self->_collect_current_job();
 
-            $log->debug("collected: @$cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
+            $log->debug("collected: @cmd (step: $step, pings: $pings, offset: ".$self->time_offset().")") if $log->is_debug();
         }
     );
 }
@@ -162,26 +170,27 @@ sub _start_new_job {
 sub _kill_current_job {
     my ($self) = @_;
 
-    # Kill fping, if still running
+    # Kill pping, if still running
     my $job = $self->current_job;
+    my $job_pid = $job->{pid};
     if($job_pid) {
         # Check that we are killing the process we started and not an innocent bystander
         my $cmd_match = 0;
         if (open(proc_fh, "/proc/${job_pid}/cmdline")) {
-            $cmd_match = (join('', readline(proc_fh)) eq $job->{cmd});
+            $cmd_match = (join('', readline(proc_fh)) eq $job->{effective_cmd});
             close(proc_fh);
         }
         if($cmd_match && kill(0, $job->{pid})) {
-            $log->warning("killing unfinished fping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
+            $log->warning("killing unfinished pping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
             kill 9, $job->{pid};
             $job->{pid} = undef;
-	}
+        }
         elsif($job->{output}) {
-            $log->warning("fping has finished, but we didn't notice... collecting (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset.")");
+            $log->warning("pping has finished, but we didn't notice... collecting (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset.")");
             $self->_collect_current_job();
         }
         else {
-            $log->warning("fping has finished, but we didn't notice... no output found (?)");
+            $log->warning("pping has finished, but we didn't notice... no output found (?)");
         }
     }
 }
@@ -193,11 +202,12 @@ sub _collect_current_job {
     $self->current_job({});
     my %results;
 
-    # Do nothing, if fping didn't run yet or if job has been already collected
+    # Do nothing, if pping didn't run yet or if job has been already collected
     return unless $job->{output};
 
-    # Parse fping report
+    # Parse pping report
     my $text = $job->{output};
+    $log->info("Output to parse: text: ".$text."--");
     while($text !~ /\G\z/gc) {
         if($text =~ /\G(\S+)[ \t]+:/gc) {
             my $host = $1;
@@ -211,10 +221,11 @@ sub _collect_current_job {
             # sorted rtt times
             my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
             $results{$host}{rtts} = \@rtts;
+            $log->info("adding results: rtts: ".join(" ", @rtts));
         }
 
         # discard any other output on the line (ICMP host unreachable errors, etc.)
-	$text =~ /\G.*\n/gc;
+        $text =~ /\G.*\n/gc;
     }
 
     $log->debug("adding results") if $log->is_debug();
@@ -226,8 +237,8 @@ sub _collect_current_job {
         my $rrd_time = $now - $step - $now%$step;
         for my $host (keys %results) {
             my $h2o = $job->{host2order}{$host};
-            if(not defined $h2o) {
-                $log->warning("fping produced results for unknown host (host: $host, step: $step)");
+            unless ($h2o) {
+                $log->warning("pping produced results for unknown host (host: $host, step: $step)");
                 next;
             }
             for my $order (@{$h2o}) {

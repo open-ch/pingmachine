@@ -18,6 +18,8 @@ use InfluxDB::LineProtocol qw(data2line);
 
 use Pingmachine::Config;
 use Pingmachine::Order::FPing;
+use Pingmachine::Order::SPing;
+use Pingmachine::Order::PPing;
 use Pingmachine::Order::SSH;
 
 has 'id' => (
@@ -111,6 +113,26 @@ has 'fping' => (
     coerce => 1,
 );
 
+class_type 'Pingmachine::Order::SPing';
+coerce 'Pingmachine::Order::SPing', from 'HashRef',
+    via { Pingmachine::Order::SPing->new(%$_) };
+
+has 'sping' => (
+    isa => 'Pingmachine::Order::SPing',
+    is  => 'ro',
+    coerce => 1,
+);
+
+class_type 'Pingmachine::Order::PPing';
+coerce 'Pingmachine::Order::PPing', from 'HashRef',
+    via { Pingmachine::Order::PPing->new(%$_) };
+
+has 'pping' => (
+    isa => 'Pingmachine::Order::PPing',
+    is  => 'ro',
+    coerce => 1,
+);
+
 class_type 'Pingmachine::Order::SSH';
 coerce 'Pingmachine::Order::SSH', from 'HashRef',
     via { Pingmachine::Order::SSH->new(%$_) };
@@ -148,6 +170,12 @@ sub nice_name {
     if($self->probe eq 'fping') {
         return $self->id . ' (user: ' . $self->user . ', fping: ' . $self->fping->host . ')';
     }
+    elsif($self->probe eq 'sping') {
+        return $self->id . ' (user: ' . $self->user . ', sping: ' . $self->sping->host . ')';
+    }
+    elsif($self->probe eq 'pping') {
+        return $self->id . ' (user: ' . $self->user . ', pping: ' . $self->pping->host . ')';
+    }
     elsif($self->probe eq 'ssh') {
         return $self->id . ' (user: ' . $self->user . ', ssh: ' . $self->ssh->host . ')';
     }
@@ -162,6 +190,12 @@ sub probe_instance_key {
     my @keys = ( $self->probe, $self->pings, $self->step );
     if($self->probe eq 'fping') {
         push @keys, $self->fping->probe_instance_key;
+    }
+    if($self->probe eq 'sping') {
+        push @keys, $self->sping->probe_instance_key;
+    }
+    if($self->probe eq 'pping') {
+        push @keys, $self->pping->probe_instance_key;
     }
     if($self->probe eq 'ssh') {
         push @keys, $self->ssh->probe_instance_key;
