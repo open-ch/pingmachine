@@ -1,3 +1,9 @@
+2018-12-28 <kb@open.ch>
+  * Release 0.8
+  * kill safeguard: check if process is the same we started before killing
+  * scion support: added sping and pping probe
+  * ssh probe: fix nmap timeout option
+
 2018-03-07 Daniel Aschwanden <daa@open.ch>
   * Release 0.7
   * fixes division by zero error
