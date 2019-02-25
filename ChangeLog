@@ -1,3 +1,7 @@
+2019-02-25 <daa@open.ch>
+  * Release 1.0
+  * fping probe: fix pid checking
+
 2018-12-28 <kb@open.ch>
   * Release 0.8
   * kill safeguard: check if process is the same we started before killing
