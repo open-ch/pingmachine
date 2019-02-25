@@ -164,10 +164,10 @@ sub _kill_current_job {
 
     # Kill fping, if still running
     my $job = $self->current_job;
-    if($job_pid) {
+    if($job->{pid}) {
         # Check that we are killing the process we started and not an innocent bystander
         my $cmd_match = 0;
-        if (open(proc_fh, "/proc/${job_pid}/cmdline")) {
+        if (open(proc_fh, "/proc/$job->{pid}/cmdline")) {
             $cmd_match = (join('', readline(proc_fh)) eq $job->{cmd});
             close(proc_fh);
         }
