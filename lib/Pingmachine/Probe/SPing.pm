@@ -10,7 +10,7 @@ my $SCION_DIR = $ENV{'SC'} // '/home/scion/go/src/github.com/scionproto/scion';
 my $SPING_BIN = "$SCION_DIR/bin/scmp_fping";
 
 my $TIMEOUT   = 3000; # -t option (in ms)
-my $MIN_WAIT  =   10; # -i option (is ms)
+my $MIN_WAIT  =    1; # -i option (is ms)
 
 has 'name' => (
     is => 'ro',

@@ -10,7 +10,7 @@ my $FPING_BIN = -x '/usr/bin/fping' ? '/usr/bin/fping' : '/usr/sbin/fping';
 my $FPING6_BIN = '/usr/bin/fping6';
 
 my $TIMEOUT   = 3000; # -t option (in ms)
-my $MIN_WAIT  =   10; # -i option (is ms)
+my $MIN_WAIT  =    1; # -i option (is ms)
 
 has 'name' => (
     is => 'ro',
