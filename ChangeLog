@@ -1,3 +1,7 @@
+2020-05-25 <kb@open.ch>
+  * Release 1.1
+  * allow to ping more than 5000 targets
+
 2019-02-25 <daa@open.ch>
   * Release 1.0
   * fping probe: fix pid checking
