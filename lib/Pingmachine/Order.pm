@@ -20,6 +20,7 @@ use Pingmachine::Config;
 use Pingmachine::Order::FPing;
 use Pingmachine::Order::SPing;
 use Pingmachine::Order::PPing;
+use Pingmachine::Order::HTTPing;
 use Pingmachine::Order::SSH;
 
 has 'id' => (
@@ -133,6 +134,16 @@ has 'pping' => (
     coerce => 1,
 );
 
+class_type 'Pingmachine::Order::HTTPing';
+coerce 'Pingmachine::Order::HTTPing', from 'HashRef',
+    via { Pingmachine::Order::HTTPing->new(%$_) };
+
+has 'httping' => (
+    isa => 'Pingmachine::Order::HTTPing',
+    is  => 'ro',
+    coerce => 1,
+);
+
 class_type 'Pingmachine::Order::SSH';
 coerce 'Pingmachine::Order::SSH', from 'HashRef',
     via { Pingmachine::Order::SSH->new(%$_) };
@@ -176,6 +187,9 @@ sub nice_name {
     elsif($self->probe eq 'pping') {
         return $self->id . ' (user: ' . $self->user . ', pping: ' . $self->pping->host . ')';
     }
+    elsif($self->probe eq 'httping') {
+        return $self->id . ' (user: ' . $self->user . ', httping: ' . $self->httping->url . ')';
+    }
     elsif($self->probe eq 'ssh') {
         return $self->id . ' (user: ' . $self->user . ', ssh: ' . $self->ssh->host . ')';
     }
@@ -196,6 +210,9 @@ sub probe_instance_key {
     }
     if($self->probe eq 'pping') {
         push @keys, $self->pping->probe_instance_key;
+    }
+    if($self->probe eq 'httping') {
+        push @keys, $self->httping->probe_instance_key;
     }
     if($self->probe eq 'ssh') {
         push @keys, $self->ssh->probe_instance_key;
