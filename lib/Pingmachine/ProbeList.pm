@@ -90,8 +90,8 @@ sub add_order {
                 step       => $order->step,
                 pings      => $order->pings,
                 interval   => $order->httping->interval || 0,
-                user_agent => $order->httping->user_agent || 0,
-                proxy      => $order->httping->proxy || 0,
+                user_agent => $order->httping->user_agent || '',
+                proxy      => $order->httping->proxy || '',
             );
         }
         elsif($probe_type eq 'ssh') {

@@ -123,7 +123,7 @@ sub _start_new_job {
             if($exit and $exit != 1 and $exit != 2) {
                 # exit 1 means that some urls aren't reachable
                 # exit 2 means "any IP addresses were not found"
-                $log->warning("httping seems to have failed (exit: $exit, stderr: " . Dumper(\$job{output}) . ")");
+                $log->warning("httping seems to have failed (exit: $exit, httping output:\n" . Dumper(\$job{output}) . ")");
                 return;
             }  
 
@@ -145,15 +145,15 @@ sub _kill_current_job {
         if($job->{pid}{$url}) {
             # Check that we are killing the process we started and not an innocent bystander
             my $cmd_match = 0;
-            if (open(proc_fh, "/proc/$job->{pid}{$url}/cmdline")) {
-                $cmd_match = (join('', readline(proc_fh)) eq $job->{cmd}{$url});
-                close(proc_fh);
+            if (open(my $proc_fh, "/proc/$job->{pid}{$url}/cmdline")) {
+                $cmd_match = (join('', readline($proc_fh)) eq $job->{cmd}{$url});
+                close($proc_fh);
             }
             if($cmd_match && kill(0, $job->{pid}{$url})) {
                 $log->warning("killing unfinished httping process (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset().")");
                 kill 9, $job->{pid}{$url};
                 $job->{pid}{$url} = undef;
-	    }
+            }
             elsif($job->{output}{$url}) {
                 $log->warning("httping has finished, but we didn't notice... collecting (step: ".$self->step.", pings: ".$self->pings.", offset: ".$self->time_offset.")");
                 $self->_collect_current_job();
@@ -188,51 +188,36 @@ sub _collect_current_job {
         #	round-trip min/avg/max = 10.9/13.2/15.5 ms
         # parse line by line httping output and format it as with fping
         my @lines = split /\n/, $raw_text;
-        my $values;
-        foreach my $line (@lines) {
+        my @data;
+        for my $line (@lines) {
             # if the line contains an error (i.e. timeout, connection refused, ...) add a -
             if ($line =~ /could not connect|timeout|short read/) {
-                $values .= '- ';
+                push @data, '-';
             }
             # if the line contains the httping result add the number
             if ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
-                $values .= "$1 ";
+                push @data, $1;
             }
             # ignore all the rest
         }
-        $values =~ s/\s+$//;
-        $text .= "$url : $values\n";
-
+        # raw ping times
+        my @pings = map {$_ eq '-' ? undef : $_ / 1000} @data;
+        $results{$url}{pings} = \@pings;
+        # sorted rtt times
+        my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
+        $results{$url}{rtts} = \@rtts;
     }
 
-    while($text !~ /\G\z/gc) {
-        if($text =~ /\G(\S+)[ \t]+:/gc) {
-            my $url = $1;
-            my @data;
-            while($text =~ /\G[ \t]+([-\d\.]+)/gc) {
-                push @data, $1;
-            }
-            # raw ping times
-            my @pings = map {$_ eq '-' ? undef : $_ / 1000} @data;
-            $results{$url}{pings} = \@pings;
-            # sorted rtt times
-            my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
-            $results{$url}{rtts} = \@rtts;
-        }
-
-        # discard any other output on the line (ICMP host unreachable errors, etc.)
-        $text =~ /\G.*\n/gc;
-    }
     $log->debug("adding results") if $log->is_debug();
 
     # Add results (to RRD)
-    if(scalar keys %results) {
+    if(keys %results) {
         my $now = int(AnyEvent->now);
         my $step = $self->step;
         my $rrd_time = $now - $step - $now%$step;
         for my $url (keys %results) {
             my $u2o = $job->{url2order}{$url};
-            if(not defined $u2o) {
+            if(!defined $u2o) {
                 $log->warning("httping produced results for unknown url (url: $url, step: $step)");
                 next;
             }
@@ -243,6 +228,7 @@ sub _collect_current_job {
     }
     $log->debug("adding results finished") if $log->is_debug();
 }
+
 
 sub run {
     my ($self) = @_;
