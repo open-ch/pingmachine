@@ -94,7 +94,7 @@ sub _start_new_job {
         my $cmd = [
             $HTTPING_BIN,
             $url,
-            '-I', $user_agent,
+            '--user-agent', $user_agent,
             '-c', $pings,
             '-i', $interval,
             '-t', $TIMEOUT,
@@ -188,23 +188,22 @@ sub _collect_current_job {
         #	round-trip min/avg/max = 10.9/13.2/15.5 ms
         # parse line by line httping output and format it as with fping
         my @lines = split /\n/, $raw_text;
-        my @data;
+        my @pings;
         for my $line (@lines) {
             # if the line contains an error (i.e. timeout, connection refused, ...) add a -
             if ($line =~ /could not connect|timeout|short read/) {
-                push @data, '-';
+                push @pings, '-';
             }
             # if the line contains the httping result add the number
             if ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
-                push @data, $1;
+                push @pings, $1/1000;
             }
             # ignore all the rest
         }
         # raw ping times
-        my @pings = map {$_ eq '-' ? undef : $_ / 1000} @data;
         $results{$url}{pings} = \@pings;
         # sorted rtt times
-        my @rtts = map {sprintf "%.6e", $_ / 1000} sort {$a <=> $b} grep /^\d/, @data;
+        my @rtts = map {sprintf "%.6e", $_ } sort {$a <=> $b} grep {$_} @pings;
         $results{$url}{rtts} = \@rtts;
     }
 
