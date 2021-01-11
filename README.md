@@ -24,8 +24,6 @@ understand the reason for its architecture):
 - Consolidation using maximum, minimum and average functions.
 - Management of old targets data (the list of targets change rather frequently!)
 
-Check out also this [blog post about pingmachine](https://blog.open.ch/labs/2015/11/24/pingmachine/).
-
 Smokeping vs. Pingmachine
 -------------------------
 After initial tests with Smokeping, we decided to write our own framework for
@@ -69,7 +67,7 @@ The output produced by the monitoring work, will be put in a separate directory
                        `----< /output <----'
 
 
-Orders and telegraf orders Specification
+Orders and Telegraf Orders Specification
 --------------------
 An order is typically one target IP address that needs to be monitored. If an
 application needs to monitor an IP address, it just writes the corresponding
@@ -109,7 +107,7 @@ the corresponding order file.
 
 The file-system tree could look as follows:
 
-     /var/lib/pingmachine/OSAGping/
+     /var/lib/pingmachine/
      |---- orders/
      | |---- 6dd803dc5d29b72564467de7ddbfc695
      | |---- cd7d89acdba05cef56184db4a7b044ea
@@ -117,11 +115,10 @@ The file-system tree could look as follows:
      | |---- 6dd803dc5d29b72564467de7ddbfc695
      | |---- cd7d89acdba05cef56184db4a7b044ea
 
-Note that orders and telegraf orders are to be considered dynamic configuration, and are not meant
-to be, for example, put in a buildall configuration archive. The "users" (tmon,
-etc.) are the high-level programs that are configured by buildall, and they
+Note that orders and telegraf orders are to be considered dynamic configuration.
+The "users" (tmon, etc.) are usually high-level programs which
 will just install order and telegraf files, as needed, to do the measurements, as they were
-instructed. In other words: the complete /var/lib/pingmachine/OSAGping
+instructed. In other words: the complete /var/lib/pingmachine
 directory can be completely deleted and recreated (with the loss of measured
 data, however).
 
@@ -166,10 +163,48 @@ As soon as the "order" file of an archived order is put again into the orders
 directory, pingmachine will move the output data into place again. It should
 not be possible to have both data in output and in archive for the same order.
 
+Supported Probes
+----------------
+## fping
+
+    fping:
+        host: 213.156.230.57
+        interface: eth0
+        source_ip: 10.0.0.12
+
+Note that the source interface and IP are optional. The [fping](https://fping.org/) utility must be installed on the system.
+
+## httping
+
+    httping:
+        url: http://www.example.com
+        user_agent: pingmachine
+        proxy: http://10.0.0.24:8080
+
+Note that the user_agent and the proxy configuration are optional. The [httping](https://www.vanheusden.com/httping/) utility must be installed on the system.
+
+
+
+##  SCION SCMP and pingpong tool 
+
+    sping:
+        host: 213.156.230.57
+        interface: eth0
+        source_ip: 10.0.0.12
+        flags: 
+
+   
+    pping:
+        host: 213.156.230.57
+        interface: eth0
+        source_ip: 10.0.0.12
+        flags: 
+
+
 Sent metrics
 ------------
 For every telegraf file, both metrics gathered by pingmachine and metrics
-provided in the telegraf file are sent to InfluDB.
+provided in the telegraf file are sent 
 
 Installation
 ------------
