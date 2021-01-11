@@ -95,9 +95,9 @@ sub _start_new_job {
             $HTTPING_BIN,
             $url,
             '--user-agent', $user_agent,
-            '-c', $pings,
-            '-i', $interval,
-            '-t', $TIMEOUT,
+            '--count', $pings,
+            '--interval', $interval,
+            '--timeout', $TIMEOUT,
         ];
 
         if ( $self->proxy ) {
@@ -192,7 +192,7 @@ sub _collect_current_job {
         for my $line (@lines) {
             # if the line contains an error (i.e. timeout, connection refused, ...) add a -
             if ($line =~ /could not connect|timeout|short read/) {
-                push @pings, '-';
+                push @pings, undef;
             }
             # if the line contains the httping result add the number
             if ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
