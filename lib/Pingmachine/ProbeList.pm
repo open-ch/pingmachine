@@ -6,6 +6,7 @@ use Log::Any qw($log);
 use Pingmachine::Probe::FPing;
 use Pingmachine::Probe::SPing;
 use Pingmachine::Probe::PPing;
+use Pingmachine::Probe::HTTPing;
 use Pingmachine::Probe::SSH;
 
 has '_probes' => (
@@ -82,6 +83,15 @@ sub add_order {
                 flags     => $order->pping->flags || '',
                 interface => $order->pping->interface || 0,
 		ipv6      => $order->pping->ipv6 || 0,
+            );
+        }
+        elsif($probe_type eq 'httping') {
+            $probe = Pingmachine::Probe::HTTPing->new(
+                step       => $order->step,
+                pings      => $order->pings,
+                interval   => $order->httping->interval || 0,
+                user_agent => $order->httping->user_agent || '',
+                proxy      => $order->httping->proxy || '',
             );
         }
         elsif($probe_type eq 'ssh') {
