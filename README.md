@@ -99,21 +99,27 @@ A example telegraf order could be (in YAML):
          interface: eth2
          remote_interface: eth2
 
-The file name (the order "id") is determined by calculating the md5 checksum on
-the file contents. This makes sure that different orders have different
-identifiers and also that, if the same order reappears, it is going to have the
-same id. The file name of the existing telegraf files is the same as the one of
+The relative path from the orders/ directory is the "order id" and it is
+responsibility of the client. To make sure that different orders have different
+identifiers the "order id" can be the md5 checksum of the file contents. The
+file name of the existing telegraf files must be the same as the one of
 the corresponding order file.
+
+Be aware that there are file file system limitation for the number of links
+that an inode can have, therefore paths of arbitrary depth in /orders and
+/telegraf are supported.
 
 The file-system tree could look as follows:
 
      /var/lib/pingmachine/
      |---- orders/
-     | |---- 6dd803dc5d29b72564467de7ddbfc695
-     | |---- cd7d89acdba05cef56184db4a7b044ea
+     | |---- app1/
+     | | |---- 6dd803dc5d29b72564467de7ddbfc695
+     | | |---- cd7d89acdba05cef56184db4a7b044ea
      |---- telegraf/
-     | |---- 6dd803dc5d29b72564467de7ddbfc695
-     | |---- cd7d89acdba05cef56184db4a7b044ea
+     | |---- app1/
+     | | |---- 6dd803dc5d29b72564467de7ddbfc695
+     | | |---- cd7d89acdba05cef56184db4a7b044ea
 
 Note that orders and telegraf orders are to be considered dynamic configuration.
 The "users" (tmon, etc.) are usually high-level programs which
@@ -131,9 +137,10 @@ script. This allows us to interchange probe types easily and to offload some
 work out of the probe modules.
 
      |---- output/
-     | |---- 6dd803dc5d29b72564467de7ddbfc695/
-     | | |---- main.rrd
-     | | `---- last_result
+     | |---- app1/
+     | | |---- 6dd803dc5d29b72564467de7ddbfc695/
+     | | | |---- main.rrd
+     | | | |---- last_result
      | |---- ...
 
 Also, the output directory also contains a last_result file, with just the

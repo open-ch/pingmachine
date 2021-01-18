@@ -402,6 +402,7 @@ sub archive {
     $self->_set_is_archived(1);
 
     my $archive_dir = $self->my_archive_dir;
+    mkpath($archive_dir);
     rename($self->my_output_dir, $archive_dir) or
         $log->error("can't archive output to directory $archive_dir: $!");
 }
