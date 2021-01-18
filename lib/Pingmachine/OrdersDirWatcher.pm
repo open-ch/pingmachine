@@ -19,7 +19,6 @@ use Pingmachine::Order;
 use Pingmachine::OrderList;
 
 my $RESCAN_PERIOD = 30; # full rescan every 30 seconds (just to be sure, shouldn't be needed..)
-my $ORDER_NAME_RE = qr|^([0-9a-f]+/?)+$|; # one or more hex dirs separated by '/'
 
 has 'orders_dir' => (
     isa      => 'Str',
@@ -75,7 +74,7 @@ sub _scan_orders_directory {
     $self->_scan_orders_directory_recursively($orders_dir, '', $now, \%in_directory);
 
     for my $order_id ($self->order_list->list) {
-        if (not defined $in_directory{$order_id}) {
+        if (!$in_directory{$order_id}) {
             $self->_remove_order($order_id);
         }
     }
@@ -88,7 +87,8 @@ sub _scan_orders_directory_recursively {
     my $dh;
     opendir($dh, $dir) or die "can't open $dir: $!";
     while (my $file_relative = readdir($dh)) {
-        next if $file_relative eq '.' or $file_relative eq '..';
+        next if $file_relative eq '.';
+        next if $file_relative eq '..';
 
         my $order_id = $order_id_prefix ? "$order_id_prefix/$file_relative" : $file_relative;
         my $file = "$dir/$file_relative";
@@ -164,12 +164,6 @@ sub _add_order {
 
     # Skip it, if already known
     return if $self->order_list->has_order($order_id);
-
-    # Skip it, if it doesn't look like a order file
-    $order_id =~ $ORDER_NAME_RE or do {
-    $log->notice("skipping file in orders directory: $order_id");
-    return;
-    };
 
     # Parse
     my $order = $self->_parse_order($order_id, $self ->orders_dir . '/' . $order_id, $self ->telegraf_dir . '/' . $order_id);
