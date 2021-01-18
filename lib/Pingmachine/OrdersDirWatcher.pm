@@ -19,7 +19,7 @@ use Pingmachine::Order;
 use Pingmachine::OrderList;
 
 my $RESCAN_PERIOD = 30; # full rescan every 30 seconds (just to be sure, shouldn't be needed..)
-my $ORDER_NAME_RE = qr|^[0-9a-f]+$|;
+my $ORDER_NAME_RE = qr|^([0-9a-f]+/?)+$|; # one or more hex dirs separated by '/'
 
 has 'orders_dir' => (
     isa      => 'Str',
@@ -68,23 +68,43 @@ sub BUILD {
 # - add new orders
 sub _scan_orders_directory {
     my ($self) = @_;
-    my $dh;
     my %in_directory; # used to track deleted orders
     my $orders_dir = $self->orders_dir;
-    my $max_age = Pingmachine::Config->orders_max_age;
     my $now = int(AnyEvent->now);
-    opendir($dh, $orders_dir) or die "can't open $orders_dir: $!";
-    ORDER: while (my $order_id = readdir($dh)) {
-        next if $order_id eq '.' or $order_id eq '..';
 
-        # Check: obsolete
-        my $file = $orders_dir . '/' . $order_id;
+    $self->_scan_orders_directory_recursively($orders_dir, '', $now, \%in_directory);
+
+    for my $order_id ($self->order_list->list) {
+        if (not defined $in_directory{$order_id}) {
+            $self->_remove_order($order_id);
+        }
+    }
+
+    return;
+}
+
+sub _scan_orders_directory_recursively {
+    my ($self, $dir, $order_id_prefix, $now, $in_directory) = @_;
+    my $dh;
+    opendir($dh, $dir) or die "can't open $dir: $!";
+    while (my $file_relative = readdir($dh)) {
+        next if $file_relative eq '.' or $file_relative eq '..';
+
+        my $order_id = $order_id_prefix ? "$order_id_prefix/$file_relative" : $file_relative;
+        my $file = "$dir/$file_relative";
+        if (-d $file) {
+            $self->_scan_orders_directory_recursively($file, $order_id, $now, $in_directory);
+            next;
+        }
+
+        # Archive file if too old
         my ($mtime) = (lstat($file))[9];
         defined $mtime or do {
             $log->warn("can't stat $file: $!");
-            next ORDER;
+            next;
         };
         my $timediff = $now - $mtime;
+        my $max_age = Pingmachine::Config->orders_max_age;
         if($timediff > $max_age) {
             $log->info("archiving old order: $order_id (age: ${timediff}s)");
             if($self->order_list->get_order($order_id)) {
@@ -95,19 +115,18 @@ sub _scan_orders_directory {
                 $order->archive($order_id) if $order;
             }
             unlink($file);
-            next ORDER;
+            next;
         }
 
         # Add order
         $self->_add_order($order_id);
-        $in_directory{$order_id} = 1;
+        $in_directory->{$order_id} = 1;
     }
-    for my $order_id ($self->order_list->list) {
-        if (not defined $in_directory{$order_id}) {
-            $self->_remove_order($order_id);
-        }
-    }
-}
+
+    closedir($dh);
+    return;
+};
+
 
 sub _parse_order {
     my ($self, $order_id, $order_file, $telegraf_file) = @_;
