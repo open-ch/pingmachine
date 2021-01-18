@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 ###############################################################################
 #
 # Pingmachine - Smokeping-like Latency Measurement
@@ -45,7 +45,7 @@ sub main {
         for my $arg (qw(id period out)) {
             defined $opts{$arg} or die "mandatory option $arg not defined\n";
         }
-        
+
         if(grep {$_ eq $opts{period}} qw(day week month)) {
             given($opts{period}) {
                 when('day')  { $opts{period} = 86400;    }
@@ -53,16 +53,16 @@ sub main {
                 default      { $opts{period} = 86400*30; }
             }
         }
-        
+
         looks_like_number($opts{period}) or die "period $opts{period} is neither a number nor day|week|month\n";
-        
+
         my $id = get_full_id($opts{id});
 
         my $rrd_file = "$PINGM_OUTPUT/$id/main.rrd";
         my $order_file = "$PINGM_ORDERS/$id";
-        
+
         die "order_id '$id' invalid\n" unless -f $rrd_file && -f $order_file;
-        
+
         my $pings;
         open(my $fd, '<', $order_file);
         while(<$fd>) {
@@ -71,9 +71,9 @@ sub main {
                 last;
             }
         }
-        
+
         die "could not parse order file\n" unless $pings;
-        
+
         Pingmachine::Graph::Smokeping->graph(
             img      => $opts{out},
             rrd      => $rrd_file,
@@ -82,7 +82,7 @@ sub main {
             width    => 510,
             height   => 300,
         );
-        
+
         print "image $opts{out} successfully created\n";
     }
     catch {
@@ -92,12 +92,12 @@ sub main {
 
 sub get_full_id {
     my $id = shift;
-    
+
     opendir(my $dh, $PINGM_ORDERS) || die "can't opendir $PINGM_ORDERS: $!";
     my @id_files = grep { /^$id/ && -f "$PINGM_ORDERS/$_" } readdir($dh);
-    
+
     die "order_id $id invalid\n" unless @id_files == 1;
-    
+
     return $id_files[0];
 }
 

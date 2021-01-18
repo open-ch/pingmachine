@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 ###############################################################################
 #
 # Pingmachine - Smokeping-like Latency Measurement
@@ -10,6 +10,9 @@
 # See LICENSE file for the software licensing conditions.
 #
 ###############################################################################
+
+use strict;
+use warnings;
 
 use EV;
 use Pingmachine::Main;

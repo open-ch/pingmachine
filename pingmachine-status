@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 ###############################################################################
 #
 # Pingmachine - Smokeping-like Latency Measurement
@@ -12,6 +12,7 @@
 ###############################################################################
 
 use strict;
+use warnings;
 use feature ':5.10';
 use YAML::XS qw(LoadFile Dump);
 use Term::ANSIColor;
@@ -59,7 +60,7 @@ sub pretty_loss {
     else {
         return my_colored($loss_pct, 'red');
     }
-    return 
+    return
 }
 
 sub pretty_time {
@@ -126,7 +127,7 @@ sub main {
         }
         $orders_by_user{$order->{user}}{$of} = $order;
     }
-    
+
     # read results
     for my $oid (keys %orders) {
         if(-f "$OUTPUT_DIR/$oid/last_result") {
@@ -159,7 +160,7 @@ sub main {
                 $order->{probe_host} // '-',
                 !defined $order->{result} ? '-' : (
                     time - $order->{result}{updated} > $order->{step} ?
-                        my_colored(pretty_time($order->{result}{updated}), 'red') : 
+                        my_colored(pretty_time($order->{result}{updated}), 'red') :
                         pretty_time($order->{result}{updated})
                 ),
                 !defined $order->{result} ? '-' : (
