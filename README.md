@@ -48,6 +48,84 @@ One of the things that pingmachine is optimized for, is high dynamicity of the
 configuration. What needs to be measured could change every minute and
 pingmachine should be able to handle it.
 
+
+### Order Interface
+
+Pingmachine uses a directory where configuration
+"snippets" are put by whoever wants something to be done. These configuration
+snippets are called *orders*
+
+Pingmachine monitors the /orders and immediately picks up new and modified orders
+and does what is necessary to start with the measurements. If the order file is
+deleted, pingmachine will also automatically stop with that monitoring. Please do not put the order file directly into the orders directory (see old order interface), but in a subdirectory of your choise, eventually structured with further subdirectories as you like.
+
+The output produced by the monitoring work will be put in a separate directory
+(/output). It will reflect the structure of the input folder:
+
+                    .---> /orders/... >---,
+                   /                       \
+    Application---.                         .--- pingmachine <---> fping
+                   \                       /
+                    `---< /output/... <---'
+
+
+#### Orders Specification
+
+An order is typically one target IP address that needs to be monitored. If an
+application needs to monitor an IP address, it just writes the corresponding
+order file in the "/orders" directory
+
+Orders also need to be periodically refreshed (at least once an hour), to make
+sure that pingmachine continues with the measurements. This mechanism is needed
+to make sure that no stale configuration has the consequence of monitoring an
+IP address indefinitely.
+
+A example order could be (in YAML):
+
+     user: tmon
+     task: tun_eth0_4061
+     step: 300
+     pings: 20
+     probe: fping
+     fping:
+         host: 62.179.116.250
+
+To additionally forward the measurements to telegraf, the order can optionally be extended with measurement name and tags:
+
+     measurement_name: tunnel
+     tags:
+         tunnel_id: 12458
+         remote_host: 5292
+         interface: eth2
+         remote_interface: eth2
+
+The relative path from the orders/ directory is the "order id" and it is
+chosen by the client and that it is unique for all applications and all targets.
+We suggest to use a subdirectory per application and an application uniqe name
+for the order file.
+
+Be aware that there are file file system limitation for the number of links
+that an inode can have, therefore paths of arbitrary depth in orders/ are supported.
+
+The file-system tree could look as follows:
+
+     /var/lib/pingmachine/
+     |---- orders/
+     | |---- app1/
+     | | |---- target1
+     | | `---- target2
+     | |----...
+
+Note that orders are to be considered dynamic configuration.
+The "users" (tmon, etc.) are usually high-level programs which
+will just install order as needed. Pingmachine will then do the measurements as
+instructed. In other words: the complete /var/lib/pingmachine
+directory can be completely deleted and recreated (with the loss of measured
+data, however).
+
+
+### Old Order Interface
+
 To make this possible, pingmachine uses a directory where configuration
 "snippets" are put by whoever wants something to be done. These configuration
 snippets are called *orders* and *telegraf*. The configuration of one order or telegraf order is not allowed to
@@ -67,8 +145,8 @@ The output produced by the monitoring work, will be put in a separate directory
                        `----< /output <----'
 
 
-Orders and Telegraf Orders Specification
---------------------
+#### Orders and Telegraf Orders Specification
+
 An order is typically one target IP address that needs to be monitored. If an
 application needs to monitor an IP address, it just writes the corresponding
 order file in the "/orders" directory (more about the exact directory structure
@@ -99,31 +177,25 @@ A example telegraf order could be (in YAML):
          interface: eth2
          remote_interface: eth2
 
-The relative path from the orders/ directory is the "order id" and it is
-responsibility of the client. To make sure that different orders have different
-identifiers the "order id" can be the md5 checksum of the file contents. The
-file name of the existing telegraf files must be the same as the one of
+The file name (the order "id") is determined by calculating the md5 checksum on
+the file contents. This makes sure that different orders have different
+identifiers and also that, if the same order reappears, it is going to have the
+same id. The file name of the existing telegraf files is the same as the one of
 the corresponding order file.
-
-Be aware that there are file file system limitation for the number of links
-that an inode can have, therefore paths of arbitrary depth in /orders and
-/telegraf are supported.
 
 The file-system tree could look as follows:
 
      /var/lib/pingmachine/
      |---- orders/
-     | |---- app1/
-     | | |---- 6dd803dc5d29b72564467de7ddbfc695
-     | | |---- cd7d89acdba05cef56184db4a7b044ea
+     | |---- 6dd803dc5d29b72564467de7ddbfc695
+     | `---- cd7d89acdba05cef56184db4a7b044ea
      |---- telegraf/
-     | |---- app1/
-     | | |---- 6dd803dc5d29b72564467de7ddbfc695
-     | | |---- cd7d89acdba05cef56184db4a7b044ea
+     | |---- 6dd803dc5d29b72564467de7ddbfc695
+     | `---- cd7d89acdba05cef56184db4a7b044ea
 
 Note that orders and telegraf orders are to be considered dynamic configuration.
 The "users" (tmon, etc.) are usually high-level programs which
-will just install order and telegraf files, as needed, to do the measurements, as they were
+will just install order as needed. Pingmachine will then do the measurements as
 instructed. In other words: the complete /var/lib/pingmachine
 directory can be completely deleted and recreated (with the loss of measured
 data, however).
@@ -138,10 +210,13 @@ work out of the probe modules.
 
      |---- output/
      | |---- app1/
-     | | |---- 6dd803dc5d29b72564467de7ddbfc695/
-     | | | |---- main.rrd
-     | | | |---- last_result
-     | |---- ...
+     | | `---- target1/
+     | |   |---- main.rrd
+     | |   `---- last_result
+     | |---- 6dd803dc5d29b72564467de7ddbfc695/
+     | | |---- main.rrd
+     | | `---- last_result
+     | `---- ...
 
 Also, the output directory also contains a last_result file, with just the
 latest result of the pinging. It is meant to be used by programs that only need
@@ -162,9 +237,12 @@ When an order is explicitly deleted or has timed out, the corresponding output
 directory is moved to the archive directory:
 
      |---- archive/
+     | |---- app1
+     | | `---- target2
+     | |   `---- main.rrd
      | |---- 2b45d6a19d2c3684767440fcb2f0b0c9/
      | | `---- main.rrd
-     | |---- a36e19d8acd8a47acf06177680775507/
+     | |---- ...
 
 As soon as the "order" file of an archived order is put again into the orders
 directory, pingmachine will move the output data into place again. It should
@@ -192,26 +270,26 @@ Note that the user_agent and the proxy configuration are optional. The [httping]
 
 
 
-##  SCION SCMP and pingpong tool 
+##  SCION SCMP and pingpong tool
 
     sping:
         host: 213.156.230.57
         interface: eth0
         source_ip: 10.0.0.12
-        flags: 
+        flags:
 
-   
+
     pping:
         host: 213.156.230.57
         interface: eth0
         source_ip: 10.0.0.12
-        flags: 
+        flags:
 
 
 Sent metrics
 ------------
 For every telegraf file, both metrics gathered by pingmachine and metrics
-provided in the telegraf file are sent 
+provided in the telegraf file are sent
 
 Installation
 ------------
