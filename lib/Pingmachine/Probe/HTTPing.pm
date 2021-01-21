@@ -191,7 +191,7 @@ sub _collect_current_job {
         my @pings;
         for my $line (@lines) {
             # if the line contains an error (i.e. timeout, connection refused, ...) add a -
-            if ($line =~ /could not connect|timeout|short read/) {
+            if ($line =~ /could not connect|time out|short read/) {
                 push @pings, undef;
             }
             # if the line contains the httping result add the number
