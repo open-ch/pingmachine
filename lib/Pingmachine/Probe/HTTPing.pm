@@ -98,6 +98,7 @@ sub _start_new_job {
             '--count', $pings,
             '--interval', $interval,
             '--timeout', $TIMEOUT,
+            '--show-statuscodes'
         ];
 
         if ( $self->proxy ) {
@@ -181,8 +182,8 @@ sub _collect_current_job {
         my $raw_text = $job->{output}{$url};
         # sample output
         # PING neverssl.com:80 (/):
-        #	connected to neverssl.com:80 (524 bytes), seq=0 time= 10.86 ms
-        #	connected to neverssl.com:80 (524 bytes), seq=1 time= 15.46 ms
+        #	connected to neverssl.com:80 (524 bytes), seq=0 time= 10.86 ms 200 OK
+        #	connected to neverssl.com:80 (524 bytes), seq=1 time= 15.46 ms 200 OK
         #	--- http://neverssl.com/ ping statistics ---
         #	2 connects, 2 ok, 0.00% failed, time 2027ms
         #	round-trip min/avg/max = 10.9/13.2/15.5 ms
@@ -190,8 +191,8 @@ sub _collect_current_job {
         my @lines = split /\n/, $raw_text;
         my @pings;
         for my $line (@lines) {
-            # if the line contains an error (i.e. timeout, connection refused, ...) add a -
-            if ($line =~ /could not connect|time out|short read/) {
+            # if the line contains an error (i.e. timeout, connection refused, ...) or the answer is a proxy error page add a -
+            if ($line =~ /could not connect|time out|short read|403 Forbidden|407 Proxy Authentication Required|503 Service Unavailable/) {
                 push @pings, undef;
             }
             # if the line contains the httping result add the number
