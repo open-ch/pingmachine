@@ -146,7 +146,7 @@ sub _start_new_job {
 }
 
 sub _kill_current_job {
-     my ($self) = @_;
+    my ($self) = @_;
 
     # Kill httping, if still running
     my $job = $self->current_job;
