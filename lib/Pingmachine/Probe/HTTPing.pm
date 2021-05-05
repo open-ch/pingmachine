@@ -8,8 +8,7 @@ use List::Util qw(shuffle);
 use Data::Dumper;
 
 my $HTTPING_BIN = '/usr/bin/httping';
-
-my $TIMEOUT   = 15000; # -t option (in ms)
+my $TIMEOUT     = 15000; # -t option (in ms)
 
 has 'name' => (
     is => 'ro',
@@ -56,6 +55,11 @@ has 'user_agent' => (
     default => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.67 Safari/537.36",
 );
 
+has 'http_codes_as_failure' => (
+    is => 'ro',
+    isa => 'Str',
+);
+
 with 'Pingmachine::Probe';
 
 sub _start_new_job {
@@ -100,6 +104,11 @@ sub _start_new_job {
             '--timeout', $TIMEOUT,
         ];
 
+        # if specific http error codes have to be considered a failure, show-statuscode option is required
+        if ( $self->http_codes_as_failure ) {
+            push @{$cmd}, '--show-statuscodes';
+        }
+
         if ( $self->proxy ) {
             push @{$cmd}, '-x';
             push @{$cmd}, $self->proxy;
@@ -137,7 +146,7 @@ sub _start_new_job {
 }
 
 sub _kill_current_job {
-    my ($self) = @_;
+     my ($self) = @_;
 
     # Kill httping, if still running
     my $job = $self->current_job;
@@ -181,8 +190,8 @@ sub _collect_current_job {
         my $raw_text = $job->{output}{$url};
         # sample output
         # PING neverssl.com:80 (/):
-        #	connected to neverssl.com:80 (524 bytes), seq=0 time= 10.86 ms
-        #	connected to neverssl.com:80 (524 bytes), seq=1 time= 15.46 ms
+        #	connected to neverssl.com:80 (524 bytes), seq=0 time= 10.86 ms 200 OK
+        #	connected to neverssl.com:80 (524 bytes), seq=1 time= 15.46 ms 200 OK
         #	--- http://neverssl.com/ ping statistics ---
         #	2 connects, 2 ok, 0.00% failed, time 2027ms
         #	round-trip min/avg/max = 10.9/13.2/15.5 ms
@@ -194,8 +203,21 @@ sub _collect_current_job {
             if ($line =~ /could not connect|time out|short read/) {
                 push @pings, undef;
             }
+            # if http codes to be considered as failures are defined and the line contains one of them, ignore the rtt value and add a -
+            elsif ($self->http_codes_as_failure) {
+                # replace for example 403,407 with 403 [A-Z][a-z]+| 407 [A-Z][a-z]+ to match response codes 403 Forbidden, 407 Proxy Authentication Required
+                my $httping_errors .= $self->http_codes_as_failure =~ s/,/ [A-Z]+[a-z]*|/gr;
+                $httping_errors .=  ' [A-Z]+[a-z]*';
+                if ($line =~ /$httping_errors/) {
+                    push @pings, undef;
+                }
+                # if the line contains the httping result add the number
+                elsif ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
+                    push @pings, $1/1000;
+                }
+            }
             # if the line contains the httping result add the number
-            if ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
+            elsif ($line =~ /time=\s*(\d\d*.\d\d*) ms/) {
                 push @pings, $1/1000;
             }
             # ignore all the rest
