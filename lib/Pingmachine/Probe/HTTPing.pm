@@ -205,9 +205,9 @@ sub _collect_current_job {
             }
             # if http codes to be considered as failures are defined and the line contains one of them, ignore the rtt value and add a -
             elsif ($self->http_codes_as_failure) {
-                # replace for example 403,407 with 403 [A-Z][a-z]+| 407 [A-Z][a-z]+ to match response codes 403 Forbidden, 407 Proxy Authentication Required
-                my $httping_errors .= $self->http_codes_as_failure =~ s/,/ [A-Z]+[a-z]*|/gr;
-                $httping_errors .=  ' [A-Z]+[a-z]*';
+                # replace for example 403,407 with (403|407) [A-Z]+[a-z]*(\s[A-Z]+[a-z]*)? to match response codes 403 Forbidden, 407 Proxy Authentication Required
+                my $httping_errors = $self->http_codes_as_failure =~ s/,/|/gr;
+                $httping_errors = '(' . $httping_errors  . ') [A-Z]+[a-z]*(\s[A-Z]+[a-z]*)?';
                 if ($line =~ /$httping_errors/) {
                     push @pings, undef;
                 }
