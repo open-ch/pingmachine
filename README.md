@@ -265,8 +265,9 @@ Note that the source interface and IP are optional. The [fping](https://fping.or
         url: http://www.example.com
         user_agent: pingmachine
         proxy: http://10.0.0.24:8080
+        http_codes_as_failure: 403,407,503
 
-Note that the user_agent and the proxy configuration are optional. The [httping](https://www.vanheusden.com/httping/) utility must be installed on the system.
+Note that the user_agent, the proxy and the http_codes_as_failure configuration are optional. The [httping](https://www.vanheusden.com/httping/) utility must be installed on the system.
 
 
 
