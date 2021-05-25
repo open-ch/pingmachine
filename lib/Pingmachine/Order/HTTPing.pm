@@ -23,12 +23,18 @@ has 'proxy' => (
     is  => 'ro',
 );
 
+has 'http_codes_as_failure' => (
+    isa => 'Str',
+    is => 'ro',
+);
+
 sub probe_instance_key {
     my ($self) =@_;
 
     my @keys;
     push (@keys, "interval:".$self->interval)       if ($self->interval);
     push (@keys, "user_agent:".$self->user_agent)   if ($self->user_agent);
+    push (@keys, "http_codes_as_failure:".$self->http_codes_as_failure)   if ($self->http_codes_as_failure);
     push (@keys, "proxy:".$self->proxy)             if ($self->proxy);
     return join('|', @keys);
 }

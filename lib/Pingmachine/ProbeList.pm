@@ -91,6 +91,7 @@ sub add_order {
                 pings      => $order->pings,
                 interval   => $order->httping->interval || 0,
                 user_agent => $order->httping->user_agent || '',
+                http_codes_as_failure => $order->httping->http_codes_as_failure || '',
                 proxy      => $order->httping->proxy || '',
             );
         }
