@@ -164,21 +164,22 @@ sub scan_orders_dir {
             scan_orders_dir($order_path, $order_id, $orders, $orders_by_user, $any_ipv6);
         }
 
-        next unless -f "$order_path";
+        next unless -f $order_path;
         my $order;
-        try { $order = LoadFile("$order_path"); }
+        try { $order = LoadFile($order_path); }
         catch { warn "WARNING: can't parse $order_path\n"; };
-        next unless defined $order and defined $order->{user};
+        next unless $order;
+        next unless $order->{user};
         $orders->{$order_id} = $order;
         if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
             $order->{probe_host} = $order->{$order->{probe}}{host};
-            $order->{sort_key} = sortable_ip($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $order_id;
+            $order->{sort_key} = sortable_ip($order->{probe_host}) . ":$order->{probe}:$order->{step}:$order_id";
             if($order->{$order->{probe}}{host} =~ /^[:0-9a-f]+$/i) {
                 $any_ipv6 = 1;
             }
         }
         else {
-            $order->{sort_key} = 'ZZZ:' . $order->{probe} . ':' . $order->{step} . ':' . $order_id;
+            $order->{sort_key} = "ZZZ:$order->{probe}:$order->{step}:$order_id";
         }
         $orders_by_user->{$order->{user}}{$order_id} = $order;
     }
