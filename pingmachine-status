@@ -102,36 +102,13 @@ sub sortable_ip {
 }
 
 sub main {
-    # scan orders dir
-    my %orders;
-    my %orders_by_user;
-    my $any_ipv6;
-    opendir(my $od, $ORDERS_DIR) or die "ERROR: can't open $ORDERS_DIR: $!\n";
-    while(my $of = readdir($od)) {
-        next if $of eq '.' or $of eq '..';
-        next unless -f "$ORDERS_DIR/$of";
-        my $order;
-        try { $order = LoadFile("$ORDERS_DIR/$of"); }
-        catch { warn "WARNING: can't parse $ORDERS_DIR/$of\n"; };
-        next unless defined $order and defined $order->{user};
-        $orders{$of} = $order;
-        if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
-            $order->{probe_host} = $order->{$order->{probe}}{host};
-            $order->{sort_key} = sortable_ip($order->{probe_host}) . ':' . $order->{probe} . ':' . $order->{step} . ':' . $of;
-            if($order->{$order->{probe}}{host} =~ /^[:0-9a-f]+$/i) {
-                $any_ipv6 = 1;
-            }
-        }
-        else {
-            $order->{sort_key} = 'ZZZ:' . $order->{probe} . ':' . $order->{step} . ':' . $of;
-        }
-        $orders_by_user{$order->{user}}{$of} = $order;
-    }
+    my ($orders, $orders_by_user, $any_ipv6);
+    ($orders, $orders_by_user, $any_ipv6) = scan_orders_dir($ORDERS_DIR, '', $orders, $orders_by_user, $any_ipv6);
 
     # read results
-    for my $oid (keys %orders) {
+    for my $oid (keys %{$orders}) {
         if(-f "$OUTPUT_DIR/$oid/last_result") {
-            try { $orders{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result"); }
+            try { $orders->{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result"); }
             catch { warn "WARNING: can't parse $OUTPUT_DIR/$oid/last_result\n"; }
         }
     }
@@ -142,15 +119,15 @@ sub main {
         $format = "  %-8s %7s %5s %-8s %-36s %-7s %7s %4s%s\n";
     }
     my $first_user = 1;
-    for my $user (sort keys %orders_by_user) {
+    for my $user (sort keys %{$orders_by_user}) {
         $first_user ? $first_user = 0 : print "\n";
         say my_colored("- $user", 'bold');
         say "";
         printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss", "");
         printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x($any_ipv6 ? 32 : 15), '-'x7, '-'x7, '-'x4, "");
-        for my $oid (sort { $orders{$a}{sort_key} cmp $orders{$b}{sort_key} } keys %{$orders_by_user{$user}})
+        for my $oid (sort { $orders->{$a}{sort_key} cmp $orders->{$b}{sort_key} } keys %{$orders_by_user->{$user}})
         {
-            my $order = $orders{$oid};
+            my $order = $orders->{$oid};
             my $additional = additional_info($order);
             printf($format,
                 pretty_order($oid),
@@ -175,6 +152,41 @@ sub main {
     }
 }
 
+sub scan_orders_dir {
+    my ($orders_dir, $order_id_prefix, $orders, $orders_by_user, $any_ipv6) = @_;
+    opendir(my $open_orders_dir, $orders_dir) or die "ERROR: can't open $ORDERS_DIR: $!\n";
+    while(my $order_file = readdir($open_orders_dir)) {
+        next if $order_file eq '.' or $order_file eq '..';
+
+        my $order_id = $order_id_prefix ? "$order_id_prefix/$order_file" : $order_file;
+        my $order_path = "$orders_dir/$order_file";
+        if (-d $order_path) {
+            scan_orders_dir($order_path, $order_id, $orders, $orders_by_user, $any_ipv6);
+        }
+
+        next unless -f $order_path;
+        my $order;
+        try { $order = LoadFile($order_path); }
+        catch { warn "WARNING: can't parse $order_path\n"; };
+        next unless $order;
+        next unless $order->{user};
+        $orders->{$order_id} = $order;
+        if(defined $order->{probe} and defined $order->{$order->{probe}}{host}) {
+            $order->{probe_host} = $order->{$order->{probe}}{host};
+            $order->{sort_key} = sortable_ip($order->{probe_host}) . ":$order->{probe}:$order->{step}:$order_id";
+            if($order->{$order->{probe}}{host} =~ /^[:0-9a-f]+$/i) {
+                $any_ipv6 = 1;
+            }
+        }
+        else {
+            $order->{sort_key} = "ZZZ:$order->{probe}:$order->{step}:$order_id";
+        }
+        $orders_by_user->{$order->{user}}{$order_id} = $order;
+    }
+
+    return $orders, $orders_by_user, $any_ipv6;
+}
+
 sub additional_info {
     my ($order) = @_;
 
@@ -196,4 +208,3 @@ sub additional_info {
 }
 
 main;
-
