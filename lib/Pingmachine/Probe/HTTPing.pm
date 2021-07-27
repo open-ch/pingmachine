@@ -8,7 +8,7 @@ use List::Util qw(shuffle);
 use Data::Dumper;
 
 my $HTTPING_BIN = '/usr/bin/httping';
-my $TIMEOUT     = 15000; # -t option (in ms)
+my $TIMEOUT     = 15; # -t option (in s)
 
 has 'name' => (
     is => 'ro',
