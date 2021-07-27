@@ -86,12 +86,12 @@ sub _scan_orders_directory_recursively {
     my ($self, $dir, $order_id_prefix, $now, $in_directory) = @_;
     my $dh;
     opendir($dh, $dir) or die "can't open $dir: $!";
-    while (my $file_relative = readdir($dh)) {
-        next if $file_relative eq '.';
-        next if $file_relative eq '..';
+    while (my $order_file = readdir($dh)) {
+        next if $order_file eq '.';
+        next if $order_file eq '..';
 
-        my $order_id = $order_id_prefix ? "$order_id_prefix/$file_relative" : $file_relative;
-        my $file = "$dir/$file_relative";
+        my $order_id = $order_id_prefix ? "$order_id_prefix/$file_relative" : $order_file;
+        my $file = "$dir/$order_file";
         if (-d $file) {
             $self->_scan_orders_directory_recursively($file, $order_id, $now, $in_directory);
             next;
