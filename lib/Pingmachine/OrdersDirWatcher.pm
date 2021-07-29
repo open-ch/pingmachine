@@ -90,7 +90,7 @@ sub _scan_orders_directory_recursively {
         next if $order_file eq '.';
         next if $order_file eq '..';
 
-        my $order_id = $order_id_prefix ? "$order_id_prefix/$file_relative" : $order_file;
+        my $order_id = $order_id_prefix ? "$order_id_prefix/$order_file" : $order_file;
         my $file = "$dir/$order_file";
         if (-d $file) {
             $self->_scan_orders_directory_recursively($file, $order_id, $now, $in_directory);

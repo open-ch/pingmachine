@@ -17,10 +17,10 @@ use feature ':5.10';
 use YAML::XS qw(LoadFile Dump);
 use Term::ANSIColor;
 use Try::Tiny;
+use List::Util qw(max);
 
 my $ORDERS_DIR = '/var/lib/pingmachine/orders';
 my $OUTPUT_DIR = '/var/lib/pingmachine/output';
-my $ORDER_NAME_RE = qr|^[0-9a-f]+$|;
 
 my %pretty_state_map = (
     'up'      => my_colored('  UP  ', 'green'),
@@ -80,12 +80,6 @@ sub pretty_time {
     }
 }
 
-sub pretty_order {
-    my ($order_id) = @_;
-    return undef unless $order_id;
-    return substr($order_id, 0, 8);
-}
-
 sub sortable_ip {
     my ($ip) = @_;
     defined $ip or return undef;
@@ -106,7 +100,9 @@ sub main {
     ($orders, $orders_by_user, $any_ipv6) = scan_orders_dir($ORDERS_DIR, '', $orders, $orders_by_user, $any_ipv6);
 
     # read results
+    my $oid_length = 8;
     for my $oid (keys %{$orders}) {
+        $oid_length = max($oid_length, length($oid));
         if(-f "$OUTPUT_DIR/$oid/last_result") {
             try { $orders->{$oid}{result} = LoadFile("$OUTPUT_DIR/$oid/last_result"); }
             catch { warn "WARNING: can't parse $OUTPUT_DIR/$oid/last_result\n"; }
@@ -114,9 +110,9 @@ sub main {
     }
 
     # pretty print
-    state $format = "  %-8s %7s %5s  %-8s  %-15s %-7s %7s %4s%s\n";
+    state $format = "  %-${oid_length}s %7s %5s  %-8s  %-15s %-7s %7s %4s%s\n";
     if($any_ipv6) {
-        $format = "  %-8s %7s %5s %-8s %-36s %-7s %7s %4s%s\n";
+        $format = "  %-${oid_length}s %7s %5s %-8s %-36s %-7s %7s %4s%s\n";
     }
     my $first_user = 1;
     for my $user (sort keys %{$orders_by_user}) {
@@ -124,13 +120,13 @@ sub main {
         say my_colored("- $user", 'bold');
         say "";
         printf(my_colored($format, 'bold'), "order", "step", "pings", "probe", "host", "updated", "m.rtt", "loss", "");
-        printf($format, '-'x8, '-'x7, '-'x5, '-'x8, '-'x($any_ipv6 ? 32 : 15), '-'x7, '-'x7, '-'x4, "");
+        printf($format, '-'x$oid_length, '-'x7, '-'x5, '-'x8, '-'x($any_ipv6 ? 32 : 15), '-'x7, '-'x7, '-'x4, "");
         for my $oid (sort { $orders->{$a}{sort_key} cmp $orders->{$b}{sort_key} } keys %{$orders_by_user->{$user}})
         {
             my $order = $orders->{$oid};
             my $additional = additional_info($order);
             printf($format,
-                pretty_order($oid),
+                $oid,
                 "$order->{step} s",
                 $order->{pings},
                 $order->{probe},
