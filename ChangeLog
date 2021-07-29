@@ -1,3 +1,12 @@
+2021-07-29 Konrad Bucheli <kb@open.ch>
+  * Release 1.5
+  * httping probe: fix timeout
+  * pingmachine-status: support for structured order folder
+
+2021-05-26 Konrad Bucheli <kb@open.ch>
+  * Release 1.4
+  * httping probe: allow to configure HTTP error codes to be considered as timeout (e.g. proxy related failures)
+
 2021-01-21 Konrad Bucheli <kb@open.ch>
   * Release 1.3
   * support for structured order folder
