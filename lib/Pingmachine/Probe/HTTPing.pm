@@ -129,9 +129,10 @@ sub _start_new_job {
             }
             my $exit = $cbv->recv;
             $exit = $exit >> 8;
-            if($exit and $exit != 1 and $exit != 2) {
+            if($exit and $exit != 1 and $exit != 2 and $exit != 127) {
                 # exit 1 means that some urls aren't reachable
                 # exit 2 means "any IP addresses were not found"
+                # exit 127 means that the connection is actively refused
                 $log->warning("httping seems to have failed (exit: $exit, httping output:\n" . Dumper(\$job{output}) . ")");
                 return;
             }  
