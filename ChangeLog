@@ -1,3 +1,7 @@
+2021-08-30 Konrad Buchlei <kb@open.ch>
+  * Release 1.6
+  * httping probe: handle exit code 127 (connection actively refused) as 100% packet loss
+
 2021-07-29 Konrad Bucheli <kb@open.ch>
   * Release 1.5
   * httping probe: fix timeout
