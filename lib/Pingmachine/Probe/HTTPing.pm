@@ -201,7 +201,7 @@ sub _collect_current_job {
         my @pings;
         for my $line (@lines) {
             # if the line contains an error (i.e. timeout, connection refused, ...) add a -
-            if ($line =~ /could not connect|time out|short read/) {
+            if ($line =~ /could not connect|time out|timeout|short read/) {
                 push @pings, undef;
             }
             # if http codes to be considered as failures are defined and the line contains one of them, ignore the rtt value and add a -
@@ -241,6 +241,11 @@ sub _collect_current_job {
             my $u2o = $job->{url2order}{$url};
             if(!defined $u2o) {
                 $log->warning("httping produced results for unknown url (url: $url, step: $step)");
+                next;
+            }
+            # don't add results if the pings array is empty
+            if (scalar @{$results{$url}{pings}} == 0) {
+                $log->warning("httping didn't produce any result for url $url\n");
                 next;
             }
             for my $order (@{$u2o}) {
