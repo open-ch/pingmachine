@@ -157,7 +157,7 @@ sub scan_orders_dir {
         my $order_id = $order_id_prefix ? "$order_id_prefix/$order_file" : $order_file;
         my $order_path = "$orders_dir/$order_file";
         if (-d $order_path) {
-            scan_orders_dir($order_path, $order_id, $orders, $orders_by_user, $any_ipv6);
+            ($orders, $orders_by_user, $any_ipv6) = scan_orders_dir($order_path, $order_id, $orders, $orders_by_user, $any_ipv6);
         }
 
         next unless -f $order_path;
