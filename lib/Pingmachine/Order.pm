@@ -345,9 +345,15 @@ sub _update_telegraf {
 
     my @rtts    = @{$results->{pings}};
     my @sorted_rtts    = @{$results->{rtts}};
+    my $loss;
     my $all_pings = scalar @rtts;
     my $successful_pings = scalar @sorted_rtts;
-    my $loss    = 100.0*($all_pings - $successful_pings)/$all_pings;
+    if ($all_pings) {
+        $loss = 100.0*($all_pings - $successful_pings)/$all_pings;
+    }
+    else {
+        $loss = 100.0;
+    }
     my $median = $rtts[int($successful_pings/2)]; # will be undef if empty
     my $min = $sorted_rtts[0]; # will be undef if empty
     my $max = pop @sorted_rtts; # will be undef if empty
